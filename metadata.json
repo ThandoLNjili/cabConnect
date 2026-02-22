@@ -1,0 +1,5 @@
+{
+  "name": "CabConnect",
+  "description": "A scalable PWA for e-hailing with a driver dashboard and client booking interface, integrated with Firebase and WhatsApp.",
+  "requestFramePermissions": []
+}

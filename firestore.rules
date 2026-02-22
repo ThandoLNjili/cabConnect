@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read/write their own user profile
+    match /users/{userId} {
+    	allow read: if true;
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+    }
+
+    // Allow clients to create ride requests
+    match /requests/{requestId} {
+      // Driver needs to read the list
+      allow read: if true;
+      // Clients need to create new requests
+      allow create: if true;
+    }
+  }
+}
