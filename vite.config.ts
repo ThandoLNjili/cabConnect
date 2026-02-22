@@ -4,6 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Adjust base to match your GitHub Pages project name, e.g. /cabconnect/
+  base: '/cabconnect/',
   plugins: [
     react(),
     VitePWA({
