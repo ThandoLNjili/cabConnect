@@ -37,7 +37,7 @@ const ClientBooking: React.FC = () => {
     if (!formData.name || !formData.pickup || !formData.dropoff || !formData.phone) return;
     setSubmitting(true);
     try {
-      await addDoc(collection(db, 'requests'), {
+      const ref = await addDoc(collection(db, 'requests'), {
         customerName: formData.name,
         pickup: formData.pickup,
         dropoff: formData.dropoff,
@@ -45,8 +45,7 @@ const ClientBooking: React.FC = () => {
         status: 'pending',
         timestamp: new Date()
       });
-      alert('Your ride request has been submitted! You will be notified when a driver accepts.');
-      setFormData({ name: '', phone: '', pickup: '', dropoff: '' });
+      navigate(`/ride/${ref.id}`);
     } catch (error) {
       console.error('Booking failed:', error);
       alert('Something went wrong. Please try again.');

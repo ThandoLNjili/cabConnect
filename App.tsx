@@ -8,6 +8,7 @@ import DriverLogin from './components/DriverLogin';
 import DriverRegister from './components/DriverRegister';
 import PendingApproval from './components/PendingApproval';
 import AdminDashboard from './components/AdminDashboard';
+import RideStatus from './components/RideStatus';
 
 function App() {
   const { user, role, approved, booting } = useAuth();
@@ -25,6 +26,9 @@ function App() {
       <Routes>
         {/* Public passenger booking page */}
         <Route path="/" element={<ClientBooking />} />
+
+        {/* Ride status — public, no auth required */}
+        <Route path="/ride/:requestId" element={<RideStatus />} />
 
         {/* Driver login — redirect if already authenticated */}
         <Route

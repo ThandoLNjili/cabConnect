@@ -36,6 +36,13 @@ service cloud.firestore {
 
       // Prevent deletion from the client
       allow delete: if false;
+
+      // In-app chat messages — readable and writable by anyone (client is unauthenticated)
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create: if true;
+        allow update, delete: if false;
+      }
     }
   }
 }

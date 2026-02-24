@@ -1,12 +1,108 @@
 import { registerFCMToken } from '../utils/registerFCMToken';
 
-import React, { useEffect, useState } from 'react';
-import { collection, doc, onSnapshot, query, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useEffect, useRef, useState } from 'react';
+import { collection, doc, addDoc, onSnapshot, query, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db, auth } from '../firebase';
 import { RideRequest } from '../types';
-import { Power, MapPin, Phone, Clock, LogOut, User } from 'lucide-react';
+import { Power, MapPin, Phone, Clock, LogOut, User, MessageCircle, Send } from 'lucide-react';
+
+interface ChatMessage {
+  id: string;
+  text: string;
+  senderName: string;
+  senderType: 'client' | 'driver';
+  timestamp: any;
+}
+
+interface DriverChatPanelProps {
+  requestId: string;
+  driverName: string;
+}
+
+const DriverChatPanel: React.FC<DriverChatPanelProps> = ({ requestId, driverName }) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'requests', requestId, 'messages'),
+      orderBy('timestamp', 'asc')
+    );
+    return onSnapshot(q, (snap) => {
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage)));
+    });
+  }, [requestId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setSending(true);
+    try {
+      await addDoc(collection(db, 'requests', requestId, 'messages'), {
+        text: text.trim(),
+        senderName: driverName,
+        senderType: 'driver',
+        timestamp: serverTimestamp(),
+      });
+      setText('');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t pt-3">
+      <div className="flex items-center gap-1.5 mb-2 text-sm font-medium text-gray-600">
+        <MessageCircle className="w-4 h-4" /> Chat with passenger
+      </div>
+      <div className="bg-gray-50 rounded-xl overflow-hidden">
+        <div className="overflow-y-auto max-h-40 p-3 space-y-2">
+          {messages.length === 0 && (
+            <p className="text-xs text-gray-400 text-center">No messages yet.</p>
+          )}
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.senderType === 'driver' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[75%] px-3 py-1.5 rounded-2xl text-sm ${
+                msg.senderType === 'driver'
+                  ? 'bg-blue-600 text-white rounded-br-sm'
+                  : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm'
+              }`}>
+                {msg.senderType === 'client' && (
+                  <p className="text-xs font-semibold mb-0.5 text-emerald-700">{msg.senderName}</p>
+                )}
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          <div ref={bottomRef} />
+        </div>
+        <form onSubmit={send} className="flex gap-2 p-2 border-t bg-white">
+          <input
+            className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring focus:ring-blue-200"
+            placeholder="Message passenger…"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={sending || !text.trim()}
+            className="bg-blue-600 text-white p-1.5 rounded-lg disabled:opacity-50 hover:bg-blue-700 transition"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 interface DriverProfile {
   displayName: string;
@@ -186,20 +282,22 @@ const DriverDashboard: React.FC = () => {
                       onClick={async () => {
                         const user = auth.currentUser;
                         if (!user) return alert('Not authenticated');
-                        await updateDoc(doc(db, 'requests', req.id), {
+                        await updateDoc(doc(db, 'requests', req.id!), {
                           status: 'accepted',
                           driverId: user.uid,
                           acceptedAt: serverTimestamp()
                         });
-                        alert('Ride accepted!');
                       }}
                     >
                       Accept Ride
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-4 text-green-700 font-semibold text-right">
-                    Ride accepted by you
+                  <div>
+                    <div className="mt-4 text-green-700 font-semibold text-right text-sm">
+                      ✓ Ride accepted by you
+                    </div>
+                    <DriverChatPanel requestId={req.id!} driverName={profile?.displayName || 'Driver'} />
                   </div>
                 )}
               </div>
