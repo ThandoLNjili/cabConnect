@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import { getToken } from 'firebase/messaging';
 import { doc, updateDoc } from 'firebase/firestore';
 import { messaging, db, auth } from '../firebase';
@@ -14,7 +16,13 @@ export async function registerFCMToken() {
       }
     }
 
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+    // Manually register the SW so it resolves correctly under the GitHub Pages
+    // sub-path (BASE_URL = '/cabConnect/' in production, '/' in dev).
+    const swRegistration = await navigator.serviceWorker.register(
+      `${import.meta.env.BASE_URL}firebase-messaging-sw.js`,
+      { scope: import.meta.env.BASE_URL }
+    );
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swRegistration });
     if (token && auth.currentUser) {
       await updateDoc(doc(db, 'users', auth.currentUser.uid), { fcmToken: token });
     }
