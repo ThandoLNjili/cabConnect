@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, updateDoc, deleteDoc, doc, server
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { ShieldCheck, UserX, LogOut, Users } from 'lucide-react';
+import { ShieldCheck, UserX, LogOut, Users, User } from 'lucide-react';
 
 interface DriverProfile {
   uid: string;
@@ -77,10 +77,21 @@ const AdminDashboard: React.FC = () => {
           </button>
         </div>
 
-        {/* Admin UID — verify this exists in Firestore with role:"admin" */}
-        <div className="mb-6 rounded-xl bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-500 flex items-center gap-2">
-          <span className="font-medium text-gray-700">Your UID:</span>
-          <span className="font-mono break-all select-all">{adminUid ?? '—'}</span>
+        {/* Admin Profile Card */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 flex items-center gap-4">
+          <div className="bg-emerald-100 rounded-full p-3 shrink-0">
+            <User className="w-7 h-7 text-emerald-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 text-lg truncate">
+              {user?.displayName || 'Admin'}
+            </p>
+            <p className="text-sm text-gray-500 truncate">{user?.email || '—'}</p>
+            <p className="font-mono text-xs text-gray-400 truncate select-all">{adminUid}</p>
+          </div>
+          <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
+            Admin
+          </span>
         </div>
 
         {/* Pending list */}

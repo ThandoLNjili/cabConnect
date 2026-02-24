@@ -6,12 +6,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db, auth } from '../firebase';
 import { RideRequest } from '../types';
-import { Power, MapPin, Phone, Clock, LogOut } from 'lucide-react';
+import { Power, MapPin, Phone, Clock, LogOut, User } from 'lucide-react';
+
+interface DriverProfile {
+  displayName: string;
+  phone: string;
+  email: string;
+}
 
 const DriverDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [isOnline, setIsOnline] = useState<boolean>(false);
+  const [profile, setProfile] = useState<DriverProfile | null>(null);
   const [requests, setRequests] = useState<RideRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,6 +32,11 @@ const DriverDashboard: React.FC = () => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setIsOnline(!!data.available);
+        setProfile({
+          displayName: data.displayName || 'Driver',
+          phone: data.phone || '—',
+          email: user.email || '—',
+        });
       } else {
         setIsOnline(false);
       }
@@ -87,6 +99,25 @@ const DriverDashboard: React.FC = () => {
       </header>
 
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full">
+        {/* Driver Profile Card */}
+        {profile && (
+          <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 flex items-center gap-4">
+            <div className="bg-gray-100 rounded-full p-3 shrink-0">
+              <User className="w-7 h-7 text-gray-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-900 text-lg truncate">{profile.displayName}</p>
+              <p className="text-sm text-gray-500 truncate">{profile.email}</p>
+              <p className="text-sm text-gray-500">{profile.phone}</p>
+            </div>
+            <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${
+              isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+          </div>
+        )}
+
         {/* Status Toggle (per-driver) */}
         <div className="mb-8">
           <button
