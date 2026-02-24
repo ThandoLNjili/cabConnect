@@ -31,6 +31,11 @@ const DriverLogin: React.FC = () => {
       const profileSnap = await getDoc(doc(db, 'users', cred.user.uid));
       const profile = (profileSnap.exists() ? (profileSnap.data() as UserProfile) : null);
 
+      if (profile?.role === 'admin') {
+        navigate('/admin', { replace: true });
+        return;
+      }
+
       if (!profile || profile.role !== 'driver') {
         await signOut(auth);
         throw new Error('This account is not a driver account.');
@@ -45,8 +50,8 @@ const DriverLogin: React.FC = () => {
     } catch (err: any) {
       const msg =
         err?.message?.includes('auth/invalid-credential') ? 'Incorrect email or password.' :
-        err?.message?.includes('auth/too-many-requests') ? 'Too many attempts. Try again later.' :
-        err?.message || 'Login failed.';
+          err?.message?.includes('auth/too-many-requests') ? 'Too many attempts. Try again later.' :
+            err?.message || 'Login failed.';
       setError(msg);
     } finally {
       setLoading(false);
@@ -125,17 +130,6 @@ const DriverLogin: React.FC = () => {
             Register as Driver
           </button>
         </form>
-
-        <div className="mt-6 text-xs text-gray-500">
-          <p><strong>Tip:</strong> Create your driver users in Firebase Auth, then add a Firestore profile doc:</p>
-          <pre className="mt-2 bg-gray-50 border border-gray-200 rounded-xl p-3 overflow-auto">
-{`users/{uid}
-{
-  role: "driver",
-  displayName: "Driver Name"
-}`}
-          </pre>
-        </div>
       </div>
     </div>
   );

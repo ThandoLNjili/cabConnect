@@ -18,7 +18,6 @@ const DriverDashboard: React.FC = () => {
   // Subscribe to this driver's availability and register FCM token
   useEffect(() => {
     const user = auth.currentUser;
-    console.log(user);
     if (!user) return;
     registerFCMToken();
     const userRef = doc(db, 'users', user.uid);
