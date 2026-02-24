@@ -6,7 +6,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db, auth } from '../firebase';
 import { RideRequest } from '../types';
-import { Power, MapPin, Phone, Clock, LogOut, User, MessageCircle, Send, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { Power, MapPin, Phone, Clock, LogOut, User, MessageCircle, Send, History, ChevronDown, ChevronUp, Car } from 'lucide-react';
+
+const ROLE_LABELS: Record<string, string> = { driver: '🚗 Driver', admin: '🛡️ Admin' };
+const ROLE_PATHS: Record<string, string> = { driver: '/driver', admin: '/admin' };
 
 interface ChatMessage {
   id: string;
@@ -112,7 +115,7 @@ interface DriverProfile {
 
 const DriverDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, roles, activeRole, setActiveRole, approved } = useAuth();
   const [isOnline, setIsOnline] = useState<boolean>(false);
   const [profile, setProfile] = useState<DriverProfile | null>(null);
   const [requests, setRequests] = useState<RideRequest[]>([]);
@@ -183,164 +186,195 @@ const DriverDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-10">
-        <h1 className="text-xl font-bold text-gray-800">Driver Console</h1>
-        <button 
-          onClick={async () => { await logout(); navigate('/', { replace: true }); }}
-          className="text-gray-500 hover:text-red-500 transition-colors"
-        >
-          <LogOut size={24} />
-        </button>
-      </header>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-2xl mx-auto">
 
-      <main className="flex-1 p-4 max-w-2xl mx-auto w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Car className="w-6 h-6 text-blue-600" />
+            <h1 className="text-xl font-semibold text-gray-800">Driver Console</h1>
+          </div>
+          <button
+            onClick={async () => { await logout(); navigate('/', { replace: true }); }}
+            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          >
+            <LogOut className="w-4 h-4" /> Sign out
+          </button>
+        </div>
+
         {/* Driver Profile Card */}
         {profile && (
-          <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 flex items-center gap-4">
-            <div className="bg-gray-100 rounded-full p-3 shrink-0">
-              <User className="w-7 h-7 text-gray-500" />
+          <div className="bg-white rounded-2xl shadow-sm mb-6 overflow-hidden">
+            <div className="p-4 flex items-center gap-4">
+              <div className="bg-blue-100 rounded-full p-3 shrink-0">
+                <User className="w-7 h-7 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-lg truncate">{profile.displayName}</p>
+                <p className="text-sm text-gray-500 truncate">{profile.email}</p>
+                <p className="text-sm text-gray-500">{profile.phone}</p>
+              </div>
+              <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${
+                isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 text-lg truncate">{profile.displayName}</p>
-              <p className="text-sm text-gray-500 truncate">{profile.email}</p>
-              <p className="text-sm text-gray-500">{profile.phone}</p>
-            </div>
-            <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${
-              isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-            }`}>
-              {isOnline ? 'Online' : 'Offline'}
-            </span>
+            {roles.length >= 2 && (
+              <div className="border-t flex">
+                {roles.map(r => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      if (r === 'driver' && approved === false) return;
+                      setActiveRole(r);
+                      navigate(ROLE_PATHS[r] ?? '/');
+                    }}
+                    className={`flex-1 py-2 text-xs font-semibold transition ${
+                      r === activeRole
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-400 hover:bg-gray-50'
+                    }`}
+                  >
+                    {ROLE_LABELS[r] ?? r}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Status Toggle (per-driver) */}
-        <div className="mb-8">
+        {/* Status Toggle */}
+        <div className="mb-6">
           <button
             onClick={toggleStatus}
-            className={`w-full py-8 rounded-3xl shadow-lg flex flex-col items-center justify-center transition-all duration-300 transform active:scale-95 ${
-              isOnline 
-                ? 'bg-green-500 text-white hover:bg-green-600 shadow-green-200' 
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-900 shadow-gray-400'
+            className={`w-full py-8 rounded-2xl shadow-sm flex flex-col items-center justify-center transition-all duration-300 active:scale-95 ${
+              isOnline
+                ? 'bg-green-500 text-white hover:bg-green-600'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-900'
             }`}
           >
-            <Power size={48} className={`mb-2 ${isOnline ? 'text-white' : 'text-gray-500'}`} />
-            <span className="text-2xl font-bold uppercase tracking-wider">
+            <Power size={40} className={`mb-2 ${isOnline ? 'text-white' : 'text-gray-500'}`} />
+            <span className="text-xl font-bold uppercase tracking-wider">
               {isOnline ? 'You are Available' : 'You are Unavailable'}
             </span>
-            <span className="text-sm opacity-80 mt-1">
+            <span className="text-sm opacity-70 mt-1">
               {isOnline ? 'Receiving new requests' : 'Tap to start shift'}
             </span>
           </button>
         </div>
 
-        {/* Ride Requests List */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-            <Clock size={20} />
-            Ride Requests
-          </h2>
+        {/* Ride Requests */}
+        <div className="mb-2 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-gray-400" />
+          <h2 className="text-base font-semibold text-gray-700">Ride Requests</h2>
+        </div>
+        <div className="space-y-3 mb-6">
           {requests.length === 0 ? (
-            <div className="bg-white rounded-xl p-8 text-center text-gray-400">
-              No requests.
+            <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
+              <Clock className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">No active requests.</p>
             </div>
           ) : (
             requests.map((req) => (
-              <div key={req.id} className={`bg-white rounded-xl p-4 shadow-sm border-l-4 ${req.status === 'pending' ? 'border-blue-500' : 'border-green-500'} animate-fade-in`}>
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-bold text-lg text-gray-800">{req.customerName}</h3>
-                  <span className="text-xs font-medium bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
-                    {formatTime(req.timestamp)}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-3 text-gray-600">
-                    <MapPin className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
-                    <div>
-                      <span className="text-xs text-gray-400 uppercase font-bold block">Pickup</span>
-                      {req.pickup}
+              <div key={req.id} className={`bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 ${req.status === 'pending' ? 'border-blue-500' : 'border-emerald-500'}`}>
+                <div className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-semibold text-gray-900">{req.customerName}</h3>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      req.status === 'pending' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                    }`}>
+                      {req.status === 'pending' ? 'Pending' : 'Accepted'}
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-xs text-gray-400 uppercase tracking-wide font-medium block">Pickup</span>
+                        {req.pickup}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-xs text-gray-400 uppercase tracking-wide font-medium block">Dropoff</span>
+                        {req.dropoff}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 pt-2 border-t">
+                      <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+                      <a href={`tel:${req.phone}`} className="text-blue-600 hover:underline">{req.phone}</a>
+                      <span className="ml-auto text-xs text-gray-400">{formatTime(req.timestamp)}</span>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3 text-gray-600">
-                    <MapPin className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
-                    <div>
-                      <span className="text-xs text-gray-400 uppercase font-bold block">Dropoff</span>
-                      {req.dropoff}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-600 pt-2 border-t mt-2">
-                    <Phone className="w-4 h-4 text-gray-400" />
-                    <a href={`tel:${req.phone}`} className="text-blue-600 hover:underline">
-                      {req.phone}
-                    </a>
-                  </div>
-                </div>
-                {req.status === 'pending' ? (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      className="bg-blue-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-blue-700 transition"
-                      onClick={async () => {
-                        const user = auth.currentUser;
-                        if (!user) return alert('Not authenticated');
-                        await updateDoc(doc(db, 'requests', req.id!), {
-                          status: 'accepted',
-                          driverId: user.uid,
-                          acceptedAt: serverTimestamp()
-                        });
-                      }}
-                    >
-                      Accept Ride
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mt-4 flex items-center justify-between">
-                      <span className="text-green-700 font-semibold text-sm">✓ Ride accepted by you</span>
+                  {req.status === 'pending' ? (
+                    <div className="mt-4 flex justify-end">
                       <button
-                        className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700 transition text-sm"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition"
                         onClick={async () => {
-                          if (!window.confirm('Mark this ride as completed?')) return;
+                          const user = auth.currentUser;
+                          if (!user) return alert('Not authenticated');
                           await updateDoc(doc(db, 'requests', req.id!), {
-                            status: 'completed',
-                            completedAt: serverTimestamp()
+                            status: 'accepted',
+                            driverId: user.uid,
+                            acceptedAt: serverTimestamp()
                           });
                         }}
                       >
-                        Complete Ride
+                        Accept Ride
                       </button>
                     </div>
-                    <DriverChatPanel requestId={req.id!} driverName={profile?.displayName || 'Driver'} />
-                  </div>
-                )}
+                  ) : (
+                    <div>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-emerald-700 font-medium text-sm">✓ Accepted by you</span>
+                        <button
+                          className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition"
+                          onClick={async () => {
+                            if (!window.confirm('Mark this ride as completed?')) return;
+                            await updateDoc(doc(db, 'requests', req.id!), {
+                              status: 'completed',
+                              completedAt: serverTimestamp()
+                            });
+                          }}
+                        >
+                          Complete Ride
+                        </button>
+                      </div>
+                      <DriverChatPanel requestId={req.id!} driverName={profile?.displayName || 'Driver'} />
+                    </div>
+                  )}
+                </div>
               </div>
             ))
           )}
         </div>
 
         {/* Ride History */}
-        <div className="mt-6">
-          <button
-            onClick={() => setHistoryOpen(o => !o)}
-            className="w-full flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-3 text-gray-700 hover:bg-gray-50 transition"
-          >
-            <span className="flex items-center gap-2 font-semibold">
-              <History className="w-5 h-5 text-gray-400" />
-              Ride History
-              <span className="ml-1 text-xs font-normal bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{history.length}</span>
-            </span>
-            {historyOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
+        <button
+          onClick={() => setHistoryOpen(o => !o)}
+          className="w-full flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-3 text-gray-700 hover:bg-gray-50 transition"
+        >
+          <span className="flex items-center gap-2 font-semibold text-sm">
+            <History className="w-4 h-4 text-gray-400" />
+            Ride History
+            <span className="text-xs font-normal bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{history.length}</span>
+          </span>
+          {historyOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
 
-          {historyOpen && (
-            <div className="mt-2 space-y-3">
-              {history.length === 0 ? (
-                <div className="bg-white rounded-xl p-6 text-center text-gray-400 text-sm">
-                  No completed rides yet.
-                </div>
-              ) : (
-                history.map((req) => (
-                  <div key={req.id} className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-gray-300">
+        {historyOpen && (
+          <div className="mt-2 space-y-2">
+            {history.length === 0 ? (
+              <div className="bg-white rounded-2xl shadow-sm p-6 text-center text-gray-400 text-sm">
+                No completed rides yet.
+              </div>
+            ) : (
+              history.map((req) => (
+                <div key={req.id} className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-gray-200">
+                  <div className="p-4">
                     <div className="flex justify-between items-start mb-2">
                       <p className="font-semibold text-gray-800">{req.customerName}</p>
                       <span className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full">Completed</span>
@@ -348,11 +382,11 @@ const DriverDashboard: React.FC = () => {
                     <div className="space-y-1.5 text-sm text-gray-600">
                       <div className="flex items-start gap-2">
                         <MapPin className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
-                        <span><span className="font-medium text-gray-400 text-xs uppercase tracking-wide">From </span>{req.pickup}</span>
+                        <span><span className="text-xs text-gray-400 uppercase tracking-wide font-medium">From </span>{req.pickup}</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <MapPin className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-                        <span><span className="font-medium text-gray-400 text-xs uppercase tracking-wide">To </span>{req.dropoff}</span>
+                        <span><span className="text-xs text-gray-400 uppercase tracking-wide font-medium">To </span>{req.dropoff}</span>
                       </div>
                       {req.completedAt && (
                         <p className="text-xs text-gray-400 pt-1">
@@ -364,12 +398,13 @@ const DriverDashboard: React.FC = () => {
                       )}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </main>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+      </div>
     </div>
   );
 };

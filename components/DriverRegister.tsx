@@ -21,7 +21,8 @@ const DriverRegister: React.FC = () => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await setDoc(doc(db, 'users', cred.user.uid), {
-        role: 'driver',
+        role: 'driver',        // legacy compat
+        roles: ['driver'],     // multi-role field
         approved: false,
         displayName,
         phone,

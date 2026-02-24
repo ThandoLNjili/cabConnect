@@ -7,9 +7,17 @@ import { Lock, Mail, KeyRound } from 'lucide-react';
 
 type UserProfile = {
   role?: string;
+  roles?: string[];
   displayName?: string;
   approved?: boolean;
 };
+
+function normaliseRoles(p: UserProfile | null): string[] {
+  if (!p) return [];
+  if (Array.isArray(p.roles) && p.roles.length > 0) return p.roles;
+  if (p.role) return [p.role];
+  return [];
+}
 
 const DriverLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -31,17 +39,25 @@ const DriverLogin: React.FC = () => {
       const profileSnap = await getDoc(doc(db, 'users', cred.user.uid));
       const profile = (profileSnap.exists() ? (profileSnap.data() as UserProfile) : null);
 
-      if (profile?.role === 'admin') {
+      const roles = normaliseRoles(profile);
+
+      if (roles.length === 0) {
+        await signOut(auth);
+        throw new Error('This account has no assigned role.');
+      }
+
+      // Multi-role: admin takes priority for initial landing
+      if (roles.includes('admin')) {
         navigate('/admin', { replace: true });
         return;
       }
 
-      if (!profile || profile.role !== 'driver') {
+      if (!roles.includes('driver')) {
         await signOut(auth);
         throw new Error('This account is not a driver account.');
       }
 
-      if (profile.approved === false) {
+      if (profile?.approved === false) {
         navigate('/pending', { replace: true });
         return;
       }

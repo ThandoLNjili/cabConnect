@@ -11,7 +11,7 @@ import AdminDashboard from './components/AdminDashboard';
 import RideStatus from './components/RideStatus';
 
 function App() {
-  const { user, role, approved, booting } = useAuth();
+  const { user, roles, approved, booting } = useAuth();
 
   if (booting) {
     return (
@@ -34,11 +34,11 @@ function App() {
         <Route
           path="/driver/login"
           element={
-            user && role === 'admin'
+            user && roles.includes('admin')
               ? <Navigate to="/admin" replace />
-              : user && role === 'driver' && approved === false
+              : user && roles.includes('driver') && approved === false
                 ? <Navigate to="/pending" replace />
-                : user && role === 'driver'
+                : user && roles.includes('driver')
                   ? <Navigate to="/driver" replace />
                   : <DriverLogin />
           }
@@ -56,7 +56,7 @@ function App() {
           element={
             !user
               ? <Navigate to="/driver/login" replace />
-              : role !== 'driver'
+              : !roles.includes('driver')
                 ? <Navigate to="/" replace />
                 : approved === false
                   ? <Navigate to="/pending" replace />
@@ -82,7 +82,7 @@ function App() {
           element={
             !user
               ? <Navigate to="/driver/login" replace />
-              : role !== 'admin'
+              : !roles.includes('admin')
                 ? <Navigate to="/" replace />
                 : <AdminDashboard />
           }

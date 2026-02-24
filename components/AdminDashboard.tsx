@@ -10,12 +10,19 @@ import {
   Phone, Mail, Clock, Wifi, WifiOff, AlertCircle,
 } from 'lucide-react';
 
+const ROLE_LABELS: Record<string, string> = { driver: '🚗 Driver', admin: '🛡️ Admin' };
+const ROLE_PATHS: Record<string, string> = { driver: '/driver', admin: '/admin' };
+
+const ALL_ROLES = ['driver', 'admin'] as const;
+
 interface UserRecord {
   uid: string;
   displayName: string;
   phone: string;
   email?: string;
-  role: string;
+  role?: string;       // legacy single-role field
+  roles?: string[];    // new multi-role field
+  _roles: string[];    // normalised (computed on snapshot read)
   approved?: boolean;
   available?: boolean;
   createdAt?: any;
@@ -32,6 +39,24 @@ const UserCard: React.FC<{
   onReject: (uid: string) => void;
 }> = ({ u, actionUid, onApprove, onReject }) => {
   const [open, setOpen] = useState(false);
+  const [savingRole, setSavingRole] = useState(false);
+
+  const toggleRole = async (r: string) => {
+    setSavingRole(true);
+    try {
+      const current = u._roles;
+      const updated = current.includes(r)
+        ? current.filter(x => x !== r)
+        : [...current, r];
+      if (updated.length === 0) return; // must keep at least one role
+      await updateDoc(doc(db, 'users', u.uid), {
+        roles: updated,
+        role: updated[0],  // keep legacy field in sync
+      });
+    } finally {
+      setSavingRole(false);
+    }
+  };
 
   const fmtDate = (ts: any) => {
     if (!ts) return '—';
@@ -41,7 +66,10 @@ const UserCard: React.FC<{
   };
 
   const statusBadge = () => {
-    if (u.role === 'admin') return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Admin</span>;
+    if (u._roles.includes('admin') && !u._roles.includes('driver'))
+      return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Admin</span>;
+    if (u._roles.includes('admin') && u._roles.includes('driver'))
+      return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Admin+Driver</span>;
     if (!u.approved) return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Pending</span>;
     if (u.available) return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Online</span>;
     return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Offline</span>;
@@ -55,8 +83,8 @@ const UserCard: React.FC<{
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition"
       >
-        <div className={`rounded-full p-2 shrink-0 ${u.role === 'admin' ? 'bg-emerald-100' : u.approved ? 'bg-blue-100' : 'bg-amber-100'}`}>
-          <User className={`w-5 h-5 ${u.role === 'admin' ? 'text-emerald-600' : u.approved ? 'text-blue-600' : 'text-amber-600'}`} />
+        <div className={`rounded-full p-2 shrink-0 ${u._roles.includes('admin') ? 'bg-emerald-100' : u.approved ? 'bg-blue-100' : 'bg-amber-100'}`}>
+          <User className={`w-5 h-5 ${u._roles.includes('admin') ? 'text-emerald-600' : u.approved ? 'text-blue-600' : 'text-amber-600'}`} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-gray-900 truncate">{u.displayName || 'Unnamed'}</p>
@@ -93,11 +121,33 @@ const UserCard: React.FC<{
 
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-3.5 h-3.5 text-gray-400" />
-              <span className="text-gray-400 text-xs uppercase tracking-wide">Role</span>
+              <span className="text-gray-400 text-xs uppercase tracking-wide">Roles</span>
             </div>
-            <span className="text-gray-800 capitalize">{u.role}</span>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_ROLES.map(r => {
+                const active = u._roles.includes(r);
+                const isLast = u._roles.length === 1 && active;
+                return (
+                  <button
+                    key={r}
+                    disabled={savingRole || isLast}
+                    onClick={(e) => { e.stopPropagation(); toggleRole(r); }}
+                    title={isLast ? 'Must keep at least one role' : active ? `Remove ${r} role` : `Add ${r} role`}
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border transition ${
+                      active
+                        ? r === 'admin'
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'
+                    } disabled:opacity-40`}
+                  >
+                    {savingRole ? '…' : (active ? '✓ ' : '+ ')}{r}
+                  </button>
+                );
+              })}
+            </div>
 
-            {u.role === 'driver' && (
+            {u._roles.includes('driver') && (
               <>
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-3.5 h-3.5 text-gray-400" />
@@ -136,12 +186,12 @@ const UserCard: React.FC<{
 
           <div className="text-xs text-gray-400 pt-1 break-all">UID: {u.uid}</div>
 
-          {u.role === 'driver' && u.fcmToken && (
+          {u._roles.includes('driver') && u.fcmToken && (
             <p className="text-xs text-gray-400">Push token registered ✓</p>
           )}
 
           {/* Approve / Reject actions for pending drivers */}
-          {u.role === 'driver' && !u.approved && (
+          {u._roles.includes('driver') && !u.approved && (
             <div className="flex gap-2 pt-2 border-t">
               <button
                 disabled={actionUid === u.uid}
@@ -168,7 +218,7 @@ const UserCard: React.FC<{
 /* ─── Admin Dashboard ─── */
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, roles, activeRole, setActiveRole, approved } = useAuth();
   const adminUid = user?.uid ?? null;
 
   const [allUsers, setAllUsers] = useState<UserRecord[]>([]);
@@ -181,7 +231,13 @@ const AdminDashboard: React.FC = () => {
     const unsub = onSnapshot(
       query(collection(db, 'users'), orderBy('createdAt', 'desc')),
       (snap) => {
-        setAllUsers(snap.docs.map(d => ({ uid: d.id, ...(d.data() as Omit<UserRecord, 'uid'>) })));
+        setAllUsers(snap.docs.map(d => {
+          const data = d.data() as Omit<UserRecord, 'uid' | '_roles'>;
+          const _roles = Array.isArray(data.roles) && data.roles.length > 0
+            ? data.roles
+            : data.role ? [data.role] : [];
+          return { uid: d.id, ...data, _roles };
+        }));
         setLoading(false);
       }
     );
@@ -210,9 +266,9 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const pendingDrivers = allUsers.filter(u => u.role === 'driver' && !u.approved);
-  const approvedDrivers = allUsers.filter(u => u.role === 'driver' && u.approved);
-  const admins = allUsers.filter(u => u.role === 'admin');
+  const pendingDrivers = allUsers.filter(u => u._roles.includes('driver') && !u.approved);
+  const approvedDrivers = allUsers.filter(u => u._roles.includes('driver') && u.approved);
+  const admins = allUsers.filter(u => u._roles.includes('admin'));
 
   const filtered = filter === 'all' ? allUsers
     : filter === 'pending' ? pendingDrivers
@@ -237,19 +293,42 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Admin Profile Card */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 flex items-center gap-4">
-          <div className="bg-emerald-100 rounded-full p-3 shrink-0">
-            <User className="w-7 h-7 text-emerald-600" />
+        <div className="bg-white rounded-2xl shadow-sm mb-6 overflow-hidden">
+          <div className="p-4 flex items-center gap-4">
+            <div className="bg-emerald-100 rounded-full p-3 shrink-0">
+              <User className="w-7 h-7 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-900 text-lg truncate">
+                {user?.displayName || 'Admin'}
+              </p>
+              <p className="text-sm text-gray-500 truncate">{user?.email || '—'}</p>
+            </div>
+            <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
+              Admin
+            </span>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 text-lg truncate">
-              {user?.displayName || 'Admin'}
-            </p>
-            <p className="text-sm text-gray-500 truncate">{user?.email || '—'}</p>
-          </div>
-          <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
-            Admin
-          </span>
+          {roles.length >= 2 && (
+            <div className="border-t flex">
+              {roles.map(r => (
+                <button
+                  key={r}
+                  onClick={() => {
+                    if (r === 'driver' && approved === false) return;
+                    setActiveRole(r);
+                    navigate(ROLE_PATHS[r] ?? '/');
+                  }}
+                  className={`flex-1 py-2 text-xs font-semibold transition ${
+                    r === activeRole
+                      ? 'bg-gray-900 text-white'
+                      : 'text-gray-400 hover:bg-gray-50'
+                  }`}
+                >
+                  {ROLE_LABELS[r] ?? r}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Stat pills */}
