@@ -6,15 +6,17 @@ import { Lock, Mail, KeyRound } from 'lucide-react';
 
 type DriverLoginProps = {
   onSuccess: () => void;
+  onPending: () => void;
   onCancel: () => void;
 };
 
 type UserProfile = {
   role?: string;
   displayName?: string;
+  approved?: boolean;
 };
 
-const DriverLogin: React.FC<DriverLoginProps> = ({ onSuccess, onCancel }) => {
+const DriverLogin: React.FC<DriverLoginProps> = ({ onSuccess, onPending, onCancel }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -36,6 +38,11 @@ const DriverLogin: React.FC<DriverLoginProps> = ({ onSuccess, onCancel }) => {
       if (!profile || profile.role !== 'driver') {
         await signOut(auth);
         throw new Error('This account is not a driver account.');
+      }
+
+      if (profile.approved === false) {
+        onPending();
+        return;
       }
 
       onSuccess();

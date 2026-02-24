@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Lock, Mail, KeyRound, User } from 'lucide-react';
 
@@ -25,8 +25,10 @@ const DriverRegister: React.FC<DriverRegisterProps> = ({ onSuccess, onCancel }) 
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await setDoc(doc(db, 'users', cred.user.uid), {
         role: 'driver',
+        approved: false,
         displayName,
-        phone
+        phone,
+        createdAt: serverTimestamp(),
       });
       onSuccess();
     } catch (err: any) {

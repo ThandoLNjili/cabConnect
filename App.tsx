@@ -6,20 +6,24 @@ import DriverDashboard from './components/DriverDashboard';
 import ClientBooking from './components/ClientBooking';
 import DriverLogin from './components/DriverLogin';
 import DriverRegister from './components/DriverRegister';
+import PendingApproval from './components/PendingApproval';
+import AdminDashboard from './components/AdminDashboard';
 
 import { auth, db } from './firebase';
 
-type View = 'client' | 'driverLogin' | 'driver' | 'driverRegister';
+type View = 'client' | 'driverLogin' | 'driver' | 'driverRegister' | 'pendingApproval' | 'admin';
 
 type UserProfile = {
   role?: string;
   displayName?: string;
+  approved?: boolean;
 };
 
 function App() {
   const [view, setView] = useState<View>('client');
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [approved, setApproved] = useState<boolean | null>(null);
   const [booting, setBooting] = useState(true);
 
   // Listen for driver-register event from DriverLogin
@@ -44,9 +48,18 @@ function App() {
         const snap = await getDoc(doc(db, 'users', u.uid));
         const profile = (snap.exists() ? (snap.data() as UserProfile) : null);
         setRole(profile?.role ?? null);
+        setApproved(profile?.approved ?? null);
 
-        // If user is not driver, keep them out of driver view.
-        if (profile?.role !== 'driver' && view === 'driver') {
+        // Route based on role and approval status.
+        if (profile?.role === 'admin') {
+          setView('admin');
+        } else if (profile?.role === 'driver') {
+          if (profile.approved === false) {
+            setView('pendingApproval');
+          } else {
+            setView('driver');
+          }
+        } else {
           setView('client');
         }
       } catch {
@@ -61,9 +74,8 @@ function App() {
   }, []);
 
   const handleDriverLoginRequest = () => {
-    // If already logged in as driver, go straight in.
     if (user && role === 'driver') {
-      setView('driver');
+      setView(approved === false ? 'pendingApproval' : 'driver');
       return;
     }
     setView('driverLogin');
@@ -97,6 +109,7 @@ function App() {
       {view === 'driverLogin' && (
         <DriverLogin
           onSuccess={() => setView('driver')}
+          onPending={() => setView('pendingApproval')}
           onCancel={() => setView('client')}
         />
       )}
@@ -110,6 +123,14 @@ function App() {
 
       {view === 'driver' && (
         <DriverDashboard onLogout={handleLogout} />
+      )}
+
+      {view === 'pendingApproval' && (
+        <PendingApproval onLogout={handleLogout} />
+      )}
+
+      {view === 'admin' && (
+        <AdminDashboard onLogout={handleLogout} />
       )}
     </div>
   );
