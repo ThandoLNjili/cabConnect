@@ -294,8 +294,20 @@ const DriverDashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div>
-                    <div className="mt-4 text-green-700 font-semibold text-right text-sm">
-                      ✓ Ride accepted by you
+                    <div className="mt-4 flex items-center justify-between">
+                      <span className="text-green-700 font-semibold text-sm">✓ Ride accepted by you</span>
+                      <button
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700 transition text-sm"
+                        onClick={async () => {
+                          if (!window.confirm('Mark this ride as completed?')) return;
+                          await updateDoc(doc(db, 'requests', req.id!), {
+                            status: 'completed',
+                            completedAt: serverTimestamp()
+                          });
+                        }}
+                      >
+                        Complete Ride
+                      </button>
                     </div>
                     <DriverChatPanel requestId={req.id!} driverName={profile?.displayName || 'Driver'} />
                   </div>

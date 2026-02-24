@@ -5,7 +5,7 @@ import {
   collection, addDoc, query, orderBy, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Car, MapPin, Navigation, Phone, MessageCircle, Send, Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Car, MapPin, Navigation, Phone, MessageCircle, Send, Loader2, CheckCircle2, ArrowLeft, Star } from 'lucide-react';
 import { RideRequest, DriverProfile } from '../types';
 
 interface ChatMessage {
@@ -100,6 +100,7 @@ const RideStatus: React.FC = () => {
 
   const isPending = ride.status === 'pending';
   const isAccepted = ride.status === 'accepted';
+  const isCompleted = ride.status === 'completed';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -172,6 +173,23 @@ const RideStatus: React.FC = () => {
           </div>
         )}
 
+        {/* Completed state */}
+        {isCompleted && (
+          <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center text-center gap-3">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
+              <Star className="w-8 h-8 text-emerald-500" fill="currentColor" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800">Ride Complete!</h2>
+            <p className="text-sm text-gray-500">Thanks for riding with us, {ride.customerName}. Hope the trip was great!</p>
+            <button
+              onClick={() => navigate('/')}
+              className="mt-2 w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium hover:bg-emerald-700 transition"
+            >
+              Book Another Ride
+            </button>
+          </div>
+        )}
+
         {/* Chat — visible once driver is assigned */}
         {isAccepted && (
           <div className="bg-white rounded-2xl shadow-sm flex flex-col overflow-hidden" style={{ minHeight: '280px' }}>
@@ -224,12 +242,14 @@ const RideStatus: React.FC = () => {
           </div>
         )}
 
-        <button
-          onClick={() => navigate('/')}
-          className="w-full text-center text-sm text-gray-400 hover:text-gray-600 py-2"
-        >
-          ← Book another ride
-        </button>
+        {!isCompleted && (
+          <button
+            onClick={() => navigate('/')}
+            className="w-full text-center text-sm text-gray-400 hover:text-gray-600 py-2"
+          >
+            ← Book another ride
+          </button>
+        )}
       </main>
     </div>
   );

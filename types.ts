@@ -6,9 +6,11 @@ export interface RideRequest {
   pickup: string;
   dropoff: string;
   phone: string;
-  status: string;
+  status: 'pending' | 'accepted' | 'completed' | 'cancelled' | string;
   driverId?: string;
   timestamp: Timestamp | Date;
+  acceptedAt?: Timestamp;
+  completedAt?: Timestamp;
 }
 
 export interface AppState {
