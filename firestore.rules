@@ -8,18 +8,18 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Admins can read all profiles; users can read their own
-      allow read: if request.auth != null &&
-        (request.auth.uid == userId || isAdmin());
+      // Public read needed: app reads driver profile on auth state change (unauthenticated boot)
+      // and ClientBooking reads driver info without auth
+      allow read: if true;
 
-      // Drivers self-register, but must set approved: false and cannot set role: admin
+      // Drivers self-register — must set approved:false and cannot claim role:admin
       allow create: if request.auth != null &&
         request.auth.uid == userId &&
         request.resource.data.approved == false &&
         request.resource.data.role != 'admin';
 
-      // Users can update their own profile but cannot change approved/role
-      // Admins can update anything (including approving drivers)
+      // Users update their own profile but cannot touch approved/role
+      // Admins can update anything (approve/reject drivers)
       allow update: if request.auth != null && (
         isAdmin() ||
         (
@@ -29,7 +29,7 @@ service cloud.firestore {
         )
       );
 
-      // Only admins can delete (reject) driver profiles
+      // Only admins can delete (reject) a driver profile
       allow delete: if isAdmin();
     }
 

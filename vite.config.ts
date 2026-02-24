@@ -9,6 +9,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      scope: '/cabConnect/',
+      base: '/cabConnect/',
+      workbox: {
+        navigateFallback: '/cabConnect/index.html',
+        navigateFallbackAllowlist: [/^\/cabConnect/],
+      },
       manifest: {
         name: 'CabConnect',
         short_name: 'CabConnect',
