@@ -63,7 +63,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-emerald-600" />
             <h1 className="text-xl font-semibold">Admin — Driver Approvals</h1>
@@ -74,6 +74,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>
+        </div>
+
+        {/* Admin UID — verify this exists in Firestore with role:"admin" */}
+        <div className="mb-6 rounded-xl bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-500 flex items-center gap-2">
+          <span className="font-medium text-gray-700">Your UID:</span>
+          <span className="font-mono break-all select-all">{auth.currentUser?.uid ?? '—'}</span>
         </div>
 
         {/* Pending list */}
