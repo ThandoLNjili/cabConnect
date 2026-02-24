@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { Lock, Mail, KeyRound, User } from 'lucide-react';
 
-interface DriverRegisterProps {
-  onSuccess: () => void;
-  onCancel: () => void;
-}
-
-const DriverRegister: React.FC<DriverRegisterProps> = ({ onSuccess, onCancel }) => {
+const DriverRegister: React.FC = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -30,7 +27,7 @@ const DriverRegister: React.FC<DriverRegisterProps> = ({ onSuccess, onCancel }) 
         phone,
         createdAt: serverTimestamp(),
       });
-      onSuccess();
+      navigate('/driver/login', { replace: true });
     } catch (err: any) {
       setError(err?.message || 'Registration failed.');
     } finally {
@@ -114,7 +111,7 @@ const DriverRegister: React.FC<DriverRegisterProps> = ({ onSuccess, onCancel }) 
           </button>
           <button
             type="button"
-            onClick={onCancel}
+            onClick={() => navigate('/driver/login')}
             className="w-full rounded-xl border border-gray-200 py-2 font-medium"
           >
             Back
@@ -126,3 +123,4 @@ const DriverRegister: React.FC<DriverRegisterProps> = ({ onSuccess, onCancel }) 
 };
 
 export default DriverRegister;
+

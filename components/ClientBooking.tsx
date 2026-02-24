@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { Car, MapPin, Navigation, Send, Loader2 } from 'lucide-react';
 
 // Legacy WhatsApp driver number kept for reference (no longer used in flow)
 const DRIVER_WHATSAPP = "27611996849"; 
 
-interface ClientBookingProps {
-  onDriverLoginClick: () => void;
-}
-
-const ClientBooking: React.FC<ClientBookingProps> = ({ onDriverLoginClick }) => {
+const ClientBooking: React.FC = () => {
+  const navigate = useNavigate();
   const [isDriverAvailable, setIsDriverAvailable] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -84,7 +82,7 @@ const ClientBooking: React.FC<ClientBookingProps> = ({ onDriverLoginClick }) => 
           <div className="h-1 w-24 bg-gray-200 mx-auto rounded-full"></div>
         </div>
         <button 
-          onClick={onDriverLoginClick}
+          onClick={() => navigate('/driver/login')}
           className="mt-8 text-gray-400 text-sm hover:text-gray-600 underline"
         >
           Driver Login
@@ -194,7 +192,7 @@ const ClientBooking: React.FC<ClientBookingProps> = ({ onDriverLoginClick }) => 
 
       <footer className="p-4 text-center">
          <button 
-          onClick={onDriverLoginClick}
+          onClick={() => navigate('/driver/login')}
           className="text-gray-300 text-xs hover:text-gray-500"
         >
           Partner Login

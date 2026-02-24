@@ -2,15 +2,15 @@ import { registerFCMToken } from '../utils/registerFCMToken';
 
 import React, { useEffect, useState } from 'react';
 import { collection, doc, onSnapshot, query, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { db, auth } from '../firebase';
 import { RideRequest } from '../types';
 import { Power, MapPin, Phone, Clock, LogOut } from 'lucide-react';
 
-interface DriverDashboardProps {
-  onLogout: () => void;
-}
-
-const DriverDashboard: React.FC<DriverDashboardProps> = ({ onLogout }) => {
+const DriverDashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [isOnline, setIsOnline] = useState<boolean>(false);
   const [requests, setRequests] = useState<RideRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +18,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ onLogout }) => {
   // Subscribe to this driver's availability and register FCM token
   useEffect(() => {
     const user = auth.currentUser;
+    console.log(user);
     if (!user) return;
     registerFCMToken();
     const userRef = doc(db, 'users', user.uid);
@@ -79,7 +80,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ onLogout }) => {
       <header className="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-10">
         <h1 className="text-xl font-bold text-gray-800">Driver Console</h1>
         <button 
-          onClick={onLogout}
+          onClick={async () => { await logout(); navigate('/', { replace: true }); }}
           className="text-gray-500 hover:text-red-500 transition-colors"
         >
           <LogOut size={24} />

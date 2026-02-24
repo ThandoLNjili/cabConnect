@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { ShieldCheck, UserX, LogOut, Users } from 'lucide-react';
 
@@ -11,12 +13,10 @@ interface DriverProfile {
   createdAt?: any;
 }
 
-interface AdminDashboardProps {
-  adminUid: string | null;
-  onLogout: () => void;
-}
-
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminUid, onLogout }) => {
+const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const adminUid = user?.uid ?? null;
   const [pending, setPending] = useState<DriverProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionUid, setActionUid] = useState<string | null>(null);
@@ -39,7 +39,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminUid, onLogout }) =
   }, []);
 
   const approve = async (uid: string) => {
-    console.log('Approving driver:', adminUid);
     setActionUid(uid);
     try {
       await updateDoc(doc(db, 'users', uid), {
@@ -71,7 +70,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminUid, onLogout }) =
             <h1 className="text-xl font-semibold">Admin — Driver Approvals</h1>
           </div>
           <button
-            onClick={onLogout}
+            onClick={async () => { await logout(); navigate('/', { replace: true }); }}
             className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
           >
             <LogOut className="w-4 h-4" /> Sign out

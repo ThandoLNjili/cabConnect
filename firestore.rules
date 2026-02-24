@@ -2,30 +2,53 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // isAdmin(): checks existence of /admins/{uid} document.
+    // Uses exists() not get() — cheaper and avoids rule evaluation timeouts.
+    // To grant admin access: create admins/{uid} = {active: true} in Firebase Console.
+    function isAdmin() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // /admins collection — read-only from the app (managed via Firebase Console only)
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     match /users/{userId} {
-      // Public read: required for unauthenticated boot and ClientBooking
+      // Public read needed for ClientBooking driver-availability query
       allow read: if true;
 
-      // Drivers self-register — must set approved:false, cannot claim role:admin
+      // Drivers self-register: must be their own UID, role must be 'driver', approved must start false
       allow create: if request.auth != null &&
         request.auth.uid == userId &&
-        request.resource.data.approved == false &&
-        request.resource.data.role != 'admin';
+        request.resource.data.role == 'driver' &&
+        request.resource.data.approved == false;
 
-      // Any authenticated user can update profiles.
-      // Admin-only enforcement (approve/reject) is handled at the app layer —
-      // only users with role:'admin' are routed to AdminDashboard.
-      allow update: if request.auth != null;
+      // Drivers can update their own profile (e.g. toggle availability)
+      // but CANNOT change role or approved — prevents self-approval
+      allow update: if request.auth != null &&
+        request.auth.uid == userId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'approved']);
 
-      // Only the owning user or an authenticated user that is not changing
-      // role/approved can delete — deletions are admin-reject only in the UI.
-      allow delete: if request.auth != null;
+      // Admins can update any profile — this is the only path to set approved:true
+      allow update: if isAdmin();
+
+      // Only admins can delete profiles (driver rejection)
+      allow delete: if isAdmin();
     }
 
     match /requests/{requestId} {
+      // Anyone can read and create requests (unauthenticated passengers need this)
       allow read: if true;
       allow create: if true;
-      allow update: if true;
+
+      // Only authenticated users (drivers) can update a request (accept a ride)
+      allow update: if request.auth != null;
+
+      // Prevent deletion from the client
+      allow delete: if false;
     }
   }
 }

@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { HashRouter } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -11,15 +13,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <HashRouter>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </HashRouter>
   </React.StrictMode>
 );
-
-// Register service worker if supported (part of PWA setup)
-if ('serviceWorker' in navigator && !window.location.host.includes('stackblitz')) {
-   window.addEventListener('load', () => {
-     navigator.serviceWorker.register('/sw.js').catch(err => {
-       console.log('ServiceWorker registration failed: ', err);
-     });
-   });
-}

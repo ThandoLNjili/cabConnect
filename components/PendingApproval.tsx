@@ -1,16 +1,15 @@
 import React from 'react';
-import { signOut } from 'firebase/auth';
-import { auth } from '../firebase';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { Clock } from 'lucide-react';
 
-interface PendingApprovalProps {
-  onLogout: () => void;
-}
+const PendingApproval: React.FC = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
-const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout }) => {
   const handleLogout = async () => {
-    await signOut(auth);
-    onLogout();
+    await logout();
+    navigate('/', { replace: true });
   };
 
   return (

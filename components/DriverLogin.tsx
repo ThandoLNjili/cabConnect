@@ -1,14 +1,9 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { Lock, Mail, KeyRound } from 'lucide-react';
-
-type DriverLoginProps = {
-  onSuccess: () => void;
-  onPending: () => void;
-  onCancel: () => void;
-};
 
 type UserProfile = {
   role?: string;
@@ -16,7 +11,8 @@ type UserProfile = {
   approved?: boolean;
 };
 
-const DriverLogin: React.FC<DriverLoginProps> = ({ onSuccess, onPending, onCancel }) => {
+const DriverLogin: React.FC = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -41,11 +37,11 @@ const DriverLogin: React.FC<DriverLoginProps> = ({ onSuccess, onPending, onCance
       }
 
       if (profile.approved === false) {
-        onPending();
+        navigate('/pending', { replace: true });
         return;
       }
 
-      onSuccess();
+      navigate('/driver', { replace: true });
     } catch (err: any) {
       const msg =
         err?.message?.includes('auth/invalid-credential') ? 'Incorrect email or password.' :
@@ -115,7 +111,7 @@ const DriverLogin: React.FC<DriverLoginProps> = ({ onSuccess, onPending, onCance
 
           <button
             type="button"
-            onClick={onCancel}
+            onClick={() => navigate('/')}
             className="w-full rounded-xl border border-gray-200 py-2 font-medium"
           >
             Back
@@ -123,7 +119,7 @@ const DriverLogin: React.FC<DriverLoginProps> = ({ onSuccess, onPending, onCance
 
           <button
             type="button"
-            onClick={() => (window.dispatchEvent(new CustomEvent('driver-register')))}
+            onClick={() => navigate('/driver/register')}
             className="w-full rounded-xl border border-blue-200 py-2 font-medium text-blue-700 mt-2"
           >
             Register as Driver
@@ -146,3 +142,4 @@ const DriverLogin: React.FC<DriverLoginProps> = ({ onSuccess, onPending, onCance
 };
 
 export default DriverLogin;
+
