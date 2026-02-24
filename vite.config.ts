@@ -9,11 +9,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      scope: '/cabConnect/',
-      base: '/cabConnect/',
+      injectRegister: 'auto',
       workbox: {
-        navigateFallback: '/cabConnect/index.html',
+        navigateFallback: 'index.html',
         navigateFallbackAllowlist: [/^\/cabConnect/],
+        swDest: 'dist/sw.js',
       },
       manifest: {
         name: 'CabConnect',
