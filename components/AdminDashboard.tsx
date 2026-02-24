@@ -45,6 +45,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   }, []);
 
   const approve = async (uid: string) => {
+    console.log('Approving driver:', uid);
     setActionUid(uid);
     try {
       await updateDoc(doc(db, 'users', uid), {
