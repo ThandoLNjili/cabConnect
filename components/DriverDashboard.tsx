@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db, auth } from '../firebase';
 import { RideRequest } from '../types';
-import { Power, MapPin, Phone, Clock, LogOut, User, MessageCircle, Send } from 'lucide-react';
+import { Power, MapPin, Phone, Clock, LogOut, User, MessageCircle, Send, History, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -116,6 +116,8 @@ const DriverDashboard: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean>(false);
   const [profile, setProfile] = useState<DriverProfile | null>(null);
   const [requests, setRequests] = useState<RideRequest[]>([]);
+  const [history, setHistory] = useState<RideRequest[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Subscribe to this driver's availability and register FCM token
@@ -150,10 +152,9 @@ const DriverDashboard: React.FC = () => {
       orderBy('timestamp', 'desc')
     );
     const unsubRequests = onSnapshot(q, (snapshot) => {
-      const fetchedRequests: RideRequest[] = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as RideRequest))
-        .filter(req => req.status === 'pending' || (req.status === 'accepted' && req.driverId === user.uid));
-      setRequests(fetchedRequests);
+      const all: RideRequest[] = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as RideRequest));
+      setRequests(all.filter(req => req.status === 'pending' || (req.status === 'accepted' && req.driverId === user.uid)));
+      setHistory(all.filter(req => req.status === 'completed' && req.driverId === user.uid));
     });
     return () => unsubRequests();
   }, []);
@@ -314,6 +315,58 @@ const DriverDashboard: React.FC = () => {
                 )}
               </div>
             ))
+          )}
+        </div>
+
+        {/* Ride History */}
+        <div className="mt-6">
+          <button
+            onClick={() => setHistoryOpen(o => !o)}
+            className="w-full flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-3 text-gray-700 hover:bg-gray-50 transition"
+          >
+            <span className="flex items-center gap-2 font-semibold">
+              <History className="w-5 h-5 text-gray-400" />
+              Ride History
+              <span className="ml-1 text-xs font-normal bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{history.length}</span>
+            </span>
+            {historyOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {historyOpen && (
+            <div className="mt-2 space-y-3">
+              {history.length === 0 ? (
+                <div className="bg-white rounded-xl p-6 text-center text-gray-400 text-sm">
+                  No completed rides yet.
+                </div>
+              ) : (
+                history.map((req) => (
+                  <div key={req.id} className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-gray-300">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="font-semibold text-gray-800">{req.customerName}</p>
+                      <span className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full">Completed</span>
+                    </div>
+                    <div className="space-y-1.5 text-sm text-gray-600">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                        <span><span className="font-medium text-gray-400 text-xs uppercase tracking-wide">From </span>{req.pickup}</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                        <span><span className="font-medium text-gray-400 text-xs uppercase tracking-wide">To </span>{req.dropoff}</span>
+                      </div>
+                      {req.completedAt && (
+                        <p className="text-xs text-gray-400 pt-1">
+                          {(() => {
+                            const d = (req.completedAt as any).toDate ? (req.completedAt as any).toDate() : new Date(req.completedAt as any);
+                            return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          })()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           )}
         </div>
       </main>
