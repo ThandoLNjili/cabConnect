@@ -130,7 +130,7 @@ function App() {
       )}
 
       {view === 'admin' && (
-        <AdminDashboard onLogout={handleLogout} />
+        <AdminDashboard adminUid={user?.uid ?? null} onLogout={handleLogout} />
       )}
     </div>
   );

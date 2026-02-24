@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
-import { db, auth } from '../firebase';
+import { db } from '../firebase';
 import { ShieldCheck, UserX, LogOut, Users } from 'lucide-react';
 
 interface DriverProfile {
@@ -13,19 +12,14 @@ interface DriverProfile {
 }
 
 interface AdminDashboardProps {
+  adminUid: string | null;
   onLogout: () => void;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminUid, onLogout }) => {
   const [pending, setPending] = useState<DriverProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionUid, setActionUid] = useState<string | null>(null);
-  const [adminUid, setAdminUid] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setAdminUid(u?.uid ?? null));
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     const q = query(
@@ -45,7 +39,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   }, []);
 
   const approve = async (uid: string) => {
-    console.log('Approving driver:', uid);
+    console.log('Approving driver:', adminUid);
     setActionUid(uid);
     try {
       await updateDoc(doc(db, 'users', uid), {
