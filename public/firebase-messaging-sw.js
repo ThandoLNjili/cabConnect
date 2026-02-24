@@ -21,7 +21,8 @@ messaging.onBackgroundMessage((payload) => {
   const title = notification.title || 'New notification';
   const options = {
     body: notification.body || '',
-    icon: '/pwa-192x192.png'
+    icon: '/cabConnect/favicon.svg',
+    badge: '/cabConnect/favicon.svg',
   };
 
   self.registration.showNotification(title, options);

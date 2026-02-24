@@ -195,7 +195,7 @@ const ClientBooking: React.FC = () => {
           onClick={() => navigate('/driver/login')}
           className="text-gray-300 text-xs hover:text-gray-500"
         >
-          Partner Login
+          Driver Login
         </button>
       </footer>
     </div>

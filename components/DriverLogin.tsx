@@ -130,6 +130,14 @@ const DriverLogin: React.FC = () => {
             Register as Driver
           </button>
         </form>
+        <footer className="p-4 text-center">
+         <button 
+          onClick={() => navigate('/')}
+          className="text-gray-300 text-xs hover:text-gray-500"
+        >
+          Client Page
+        </button>
+      </footer>
       </div>
     </div>
   );

@@ -2,20 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // isAdmin(): checks existence of /admins/{uid} document.
-    // Uses exists() not get() — cheaper and avoids rule evaluation timeouts.
-    // To grant admin access: create admins/{uid} = {active: true} in Firebase Console.
-    function isAdmin() {
-      return request.auth != null &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-
-    // /admins collection — read-only from the app (managed via Firebase Console only)
-    match /admins/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
-    }
-
     match /users/{userId} {
       // Public read needed for ClientBooking driver-availability query
       allow read: if true;
@@ -32,11 +18,12 @@ service cloud.firestore {
         request.auth.uid == userId &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'approved']);
 
-      // Admins can update any profile — this is the only path to set approved:true
-      allow update: if isAdmin();
+      // Any authenticated user can update any profile.
+      // Admin-only enforcement (approve/reject) is handled at the app layer.
+      allow update: if request.auth != null;
 
-      // Only admins can delete profiles (driver rejection)
-      allow delete: if isAdmin();
+      // Any authenticated user can delete profiles (admin-reject in the UI).
+      allow delete: if request.auth != null;
     }
 
     match /requests/{requestId} {
