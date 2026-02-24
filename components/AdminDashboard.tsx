@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { ShieldCheck, UserX, LogOut, Users } from 'lucide-react';
 
@@ -19,6 +20,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [pending, setPending] = useState<DriverProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionUid, setActionUid] = useState<string | null>(null);
+  const [adminUid, setAdminUid] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setAdminUid(u?.uid ?? null));
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const q = query(
@@ -43,7 +50,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       await updateDoc(doc(db, 'users', uid), {
         approved: true,
         approvedAt: serverTimestamp(),
-        approvedBy: auth.currentUser?.uid ?? 'admin',
+        approvedBy: adminUid ?? 'admin',
       });
     } finally {
       setActionUid(null);
@@ -79,7 +86,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         {/* Admin UID — verify this exists in Firestore with role:"admin" */}
         <div className="mb-6 rounded-xl bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-500 flex items-center gap-2">
           <span className="font-medium text-gray-700">Your UID:</span>
-          <span className="font-mono break-all select-all">{auth.currentUser?.uid ?? '—'}</span>
+          <span className="font-mono break-all select-all">{adminUid ?? '—'}</span>
         </div>
 
         {/* Pending list */}
