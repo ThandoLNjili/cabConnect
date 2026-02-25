@@ -31,8 +31,13 @@ service cloud.firestore {
       allow read: if true;
       allow create: if true;
 
-      // Only authenticated users (drivers) can update a request (accept a ride)
-      allow update: if request.auth != null;
+      // Only authenticated users (drivers) can update a request (accept a ride).
+      // Unauthenticated clients may also update, but only to cancel —
+      // restricted to the exact fields written by cancelRide().
+      allow update: if request.auth != null ||
+        (request.resource.data.status == 'cancelled' &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'cancelledAt', 'cancelledBy']));
 
       // Prevent deletion from the client
       allow delete: if false;

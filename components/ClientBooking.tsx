@@ -146,7 +146,6 @@ const ClientBooking: React.FC = () => {
 
             {/* Location fields */}
             <div className="relative">
-              <div className="absolute left-5 top-12 bottom-12 w-0.5 bg-gray-200 pointer-events-none" />
 
               <div className="mb-3">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1 ml-1">

@@ -156,8 +156,14 @@ const DriverDashboard: React.FC = () => {
     );
     const unsubRequests = onSnapshot(q, (snapshot) => {
       const all: RideRequest[] = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as RideRequest));
-      setRequests(all.filter(req => req.status === 'pending' || (req.status === 'accepted' && req.driverId === user.uid)));
-      setHistory(all.filter(req => req.status === 'completed' && req.driverId === user.uid));
+      setRequests(all.filter(req =>
+        req.status === 'pending' ||
+        (req.status === 'accepted' && req.driverId === user.uid)
+      ));
+      setHistory(all.filter(req =>
+        (req.status === 'completed' || req.status === 'cancelled') &&
+        req.driverId === user.uid
+      ));
     });
     return () => unsubRequests();
   }, []);
@@ -328,20 +334,35 @@ const DriverDashboard: React.FC = () => {
                     </div>
                   ) : (
                     <div>
-                      <div className="mt-4 flex items-center justify-between">
+                      <div className="mt-4 flex items-center justify-between gap-2">
                         <span className="text-emerald-700 font-medium text-sm">✓ Accepted by you</span>
-                        <button
-                          className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition"
-                          onClick={async () => {
-                            if (!window.confirm('Mark this ride as completed?')) return;
-                            await updateDoc(doc(db, 'requests', req.id!), {
-                              status: 'completed',
-                              completedAt: serverTimestamp()
-                            });
-                          }}
-                        >
-                          Complete Ride
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            className="bg-red-500 text-white px-3 py-2 rounded-xl text-sm font-semibold hover:bg-red-600 transition"
+                            onClick={async () => {
+                              if (!window.confirm('Cancel this ride?')) return;
+                              await updateDoc(doc(db, 'requests', req.id!), {
+                                status: 'cancelled',
+                                cancelledAt: serverTimestamp(),
+                                cancelledBy: 'driver',
+                              });
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition"
+                            onClick={async () => {
+                              if (!window.confirm('Mark this ride as completed?')) return;
+                              await updateDoc(doc(db, 'requests', req.id!), {
+                                status: 'completed',
+                                completedAt: serverTimestamp()
+                              });
+                            }}
+                          >
+                            Complete Ride
+                          </button>
+                        </div>
                       </div>
                       <DriverChatPanel requestId={req.id!} driverName={profile?.displayName || 'Driver'} />
                     </div>
@@ -373,11 +394,14 @@ const DriverDashboard: React.FC = () => {
               </div>
             ) : (
               history.map((req) => (
-                <div key={req.id} className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-gray-200">
+                <div key={req.id} className={`bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 ${req.status === 'cancelled' ? 'border-red-300' : 'border-gray-200'}`}>
                   <div className="p-4">
                     <div className="flex justify-between items-start mb-2">
                       <p className="font-semibold text-gray-800">{req.customerName}</p>
-                      <span className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full">Completed</span>
+                      {req.status === 'cancelled'
+                        ? <span className="text-xs bg-red-50 text-red-600 font-medium px-2 py-0.5 rounded-full">Cancelled</span>
+                        : <span className="text-xs bg-emerald-50 text-emerald-700 font-medium px-2 py-0.5 rounded-full">Completed</span>
+                      }
                     </div>
                     <div className="space-y-1.5 text-sm text-gray-600">
                       <div className="flex items-start gap-2">
@@ -388,10 +412,11 @@ const DriverDashboard: React.FC = () => {
                         <MapPin className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
                         <span><span className="text-xs text-gray-400 uppercase tracking-wide font-medium">To </span>{req.dropoff}</span>
                       </div>
-                      {req.completedAt && (
+                      {(req.completedAt || (req as any).cancelledAt) && (
                         <p className="text-xs text-gray-400 pt-1">
                           {(() => {
-                            const d = (req.completedAt as any).toDate ? (req.completedAt as any).toDate() : new Date(req.completedAt as any);
+                            const ts = req.completedAt ?? (req as any).cancelledAt;
+                            const d = (ts as any).toDate ? (ts as any).toDate() : new Date(ts as any);
                             return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                           })()}
                         </p>

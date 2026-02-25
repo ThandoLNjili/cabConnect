@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   doc, onSnapshot, getDoc,
-  collection, addDoc, query, orderBy, serverTimestamp
+  collection, addDoc, query, orderBy, serverTimestamp, updateDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Car, MapPin, Navigation, Phone, MessageCircle, Send, Loader2, CheckCircle2, ArrowLeft, Star } from 'lucide-react';
+import { Car, MapPin, Navigation, Phone, MessageCircle, Send, Loader2, CheckCircle2, ArrowLeft, Star, XCircle } from 'lucide-react';
 import { RideRequest, DriverProfile } from '../types';
 
 interface ChatMessage {
@@ -26,6 +26,7 @@ const RideStatus: React.FC = () => {
   const [chatText, setChatText] = useState('');
   const [sending, setSending] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to ride request
@@ -37,6 +38,7 @@ const RideStatus: React.FC = () => {
     });
     return () => unsub();
   }, [requestId]);
+
 
   // Fetch driver profile when ride is accepted
   useEffect(() => {
@@ -101,6 +103,22 @@ const RideStatus: React.FC = () => {
   const isPending = ride.status === 'pending';
   const isAccepted = ride.status === 'accepted';
   const isCompleted = ride.status === 'completed';
+  const isCancelled = ride.status === 'cancelled';
+
+  const cancelRide = async () => {
+    if (!requestId) return;
+    if (!window.confirm('Are you sure you want to cancel this ride?')) return;
+    setCancelling(true);
+    try {
+      await updateDoc(doc(db, 'requests', requestId), {
+        status: 'cancelled',
+        cancelledAt: serverTimestamp(),
+        cancelledBy: 'client',
+      });
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -146,6 +164,14 @@ const RideStatus: React.FC = () => {
             </div>
             <h2 className="text-lg font-semibold text-gray-800">Looking for a driver…</h2>
             <p className="text-sm text-gray-500">We're finding the nearest available driver. This usually takes a minute.</p>
+            <button
+              onClick={cancelRide}
+              disabled={cancelling}
+              className="mt-1 flex items-center gap-2 text-sm text-red-500 hover:text-red-700 disabled:opacity-50 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-50 transition"
+            >
+              {cancelling ? <Loader2 className="animate-spin w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+              Cancel Ride
+            </button>
           </div>
         )}
 
@@ -170,6 +196,31 @@ const RideStatus: React.FC = () => {
             >
               <Phone className="w-4 h-4" /> Call Driver
             </a>
+            <button
+              onClick={cancelRide}
+              disabled={cancelling}
+              className="mt-2 flex items-center justify-center gap-2 w-full text-sm text-red-500 hover:text-red-700 disabled:opacity-50 border border-red-200 py-2 rounded-xl hover:bg-red-50 transition"
+            >
+              {cancelling ? <Loader2 className="animate-spin w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+              Cancel Ride
+            </button>
+          </div>
+        )}
+
+        {/* Cancelled state */}
+        {isCancelled && (
+          <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center text-center gap-3">
+            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+              <XCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800">Ride Cancelled</h2>
+            <p className="text-sm text-gray-500">This ride has been cancelled. You can book a new ride anytime.</p>
+            <button
+              onClick={() => navigate('/')}
+              className="mt-2 w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium hover:bg-emerald-700 transition"
+            >
+              Book a New Ride
+            </button>
           </div>
         )}
 
@@ -242,7 +293,7 @@ const RideStatus: React.FC = () => {
           </div>
         )}
 
-        {!isCompleted && (
+        {!isCompleted && !isCancelled && (
           <button
             onClick={() => navigate('/')}
             className="w-full text-center text-sm text-gray-400 hover:text-gray-600 py-2"
