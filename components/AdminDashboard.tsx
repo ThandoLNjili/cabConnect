@@ -46,7 +46,7 @@ const UserCard: React.FC<{
     try {
       const current = u._roles;
       const updated = current.includes(r)
-        ? current.filter(x => x !== r)
+        ? current.filter((x: string) => x !== r)
         : [...current, r];
       if (updated.length === 0) return; // must keep at least one role
       await updateDoc(doc(db, 'users', u.uid), {
