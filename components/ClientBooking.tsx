@@ -2,24 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { Car, MapPin, Navigation, Send, Loader2 } from 'lucide-react';
+import { Car, MapPin, Navigation, Send, Loader2, ChevronRight } from 'lucide-react';
+import GoogleMapPicker, { PickedLocation } from './GoogleMapPicker';
 
 // Legacy WhatsApp driver number kept for reference (no longer used in flow)
-const DRIVER_WHATSAPP = "27611996849"; 
+const DRIVER_WHATSAPP = "27611996849";
 
 const ClientBooking: React.FC = () => {
   const navigate = useNavigate();
   const [isDriverAvailable, setIsDriverAvailable] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [activePicker, setActivePicker] = useState<'pickup' | 'dropoff' | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    pickup: '',
-    dropoff: ''
-  });
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [pickupLoc, setPickupLoc] = useState<PickedLocation | null>(null);
+  const [dropoffLoc, setDropoffLoc] = useState<PickedLocation | null>(null);
 
   // Check if any driver is available
   useEffect(() => {
@@ -34,14 +34,16 @@ const ClientBooking: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.pickup || !formData.dropoff || !formData.phone) return;
+    if (!name || !phone || !pickupLoc || !dropoffLoc) return;
     setSubmitting(true);
     try {
       const ref = await addDoc(collection(db, 'requests'), {
-        customerName: formData.name,
-        pickup: formData.pickup,
-        dropoff: formData.dropoff,
-        phone: formData.phone,
+        customerName: name,
+        pickup: pickupLoc.label,
+        dropoff: dropoffLoc.label,
+        pickupCoords: pickupLoc.coords,
+        dropoffCoords: dropoffLoc.coords,
+        phone,
         status: 'pending',
         timestamp: new Date()
       });
@@ -52,10 +54,6 @@ const ClientBooking: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   if (loading) {
@@ -80,13 +78,29 @@ const ClientBooking: React.FC = () => {
             </p>
           <div className="h-1 w-24 bg-gray-200 mx-auto rounded-full"></div>
         </div>
-        <button 
+        <button
           onClick={() => navigate('/driver/login')}
           className="mt-8 text-gray-400 text-sm hover:text-gray-600 underline"
         >
           Driver Login
         </button>
       </div>
+    );
+  }
+
+  // ── Map picker overlay ──
+  if (activePicker) {
+    return (
+      <GoogleMapPicker
+        title={activePicker === 'pickup' ? 'Set Pickup Location' : 'Set Drop-off Location'}
+        initial={activePicker === 'pickup' ? pickupLoc ?? undefined : dropoffLoc ?? undefined}
+        onConfirm={(loc) => {
+          if (activePicker === 'pickup') setPickupLoc(loc);
+          else setDropoffLoc(loc);
+          setActivePicker(null);
+        }}
+        onClose={() => setActivePicker(null)}
+      />
     );
   }
 
@@ -110,12 +124,11 @@ const ClientBooking: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Your Name</label>
               <input
                 type="text"
-                name="name"
                 required
                 className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
                 placeholder="John Doe"
-                value={formData.name}
-                onChange={handleInputChange}
+                value={name}
+                onChange={e => setName(e.target.value)}
               />
             </div>
 
@@ -123,53 +136,65 @@ const ClientBooking: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Phone Number</label>
               <input
                 type="tel"
-                name="phone"
                 required
                 className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
                 placeholder="0123456789"
-                value={formData.phone}
-                onChange={handleInputChange}
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
               />
             </div>
 
+            {/* Location fields */}
             <div className="relative">
-              <div className="absolute left-4 top-10 bottom-4 w-0.5 bg-gray-200"></div>
-              
-              <div className="relative mb-4">
-                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1 ml-1">
-                   <Navigation className="w-4 h-4 text-emerald-600" /> Pickup Location
-                 </label>
-                 <input
-                  type="text"
-                  name="pickup"
-                  required
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
-                  placeholder="Current Location / Address"
-                  value={formData.pickup}
-                  onChange={handleInputChange}
-                />
+              <div className="absolute left-5 top-12 bottom-12 w-0.5 bg-gray-200 pointer-events-none" />
+
+              <div className="mb-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1 ml-1">
+                  <Navigation className="w-4 h-4 text-emerald-600" /> Pickup Location
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setActivePicker('pickup')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                    pickupLoc
+                      ? 'bg-emerald-50 border-emerald-300 text-gray-700'
+                      : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-emerald-300'
+                  }`}
+                >
+                  <MapPin className={`w-4 h-4 shrink-0 ${pickupLoc ? 'text-emerald-600' : 'text-gray-300'}`} />
+                  <span className="flex-1 text-sm truncate">
+                    {pickupLoc ? pickupLoc.label : 'Tap to set pickup on map'}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+                </button>
               </div>
 
-              <div className="relative">
-                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1 ml-1">
-                   <MapPin className="w-4 h-4 text-red-500" /> Drop-off
-                 </label>
-                 <input
-                  type="text"
-                  name="dropoff"
-                  required
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
-                  placeholder="Where to?"
-                  value={formData.dropoff}
-                  onChange={handleInputChange}
-                />
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1 ml-1">
+                  <MapPin className="w-4 h-4 text-red-500" /> Drop-off
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setActivePicker('dropoff')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                    dropoffLoc
+                      ? 'bg-red-50 border-red-300 text-gray-700'
+                      : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-red-300'
+                  }`}
+                >
+                  <MapPin className={`w-4 h-4 shrink-0 ${dropoffLoc ? 'text-red-500' : 'text-gray-300'}`} />
+                  <span className="flex-1 text-sm truncate">
+                    {dropoffLoc ? dropoffLoc.label : 'Tap to set drop-off on map'}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+                </button>
               </div>
             </div>
 
             <button
               type="submit"
-              disabled={submitting}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 transform transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
+              disabled={submitting || !pickupLoc || !dropoffLoc || !name || !phone}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 transform transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             >
               {submitting ? (
                 <>

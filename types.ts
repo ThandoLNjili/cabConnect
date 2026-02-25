@@ -5,6 +5,8 @@ export interface RideRequest {
   customerName: string;
   pickup: string;
   dropoff: string;
+  pickupCoords?: [number, number];
+  dropoffCoords?: [number, number];
   phone: string;
   status: 'pending' | 'accepted' | 'completed' | 'cancelled' | string;
   driverId?: string;
