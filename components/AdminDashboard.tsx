@@ -7,28 +7,50 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import {
   ShieldCheck, UserX, LogOut, Users, User, ChevronDown, ChevronUp,
-  Phone, Mail, Clock, Wifi, WifiOff, AlertCircle,
+  Phone, Mail, Clock, Wifi, WifiOff, AlertCircle, Car, Pencil, Save, X,
 } from 'lucide-react';
+
+const VEHICLE_TYPES = [
+  { value: 'sedan',    label: 'Sedan' },
+  { value: 'hatchback',label: 'Hatchback' },
+  { value: 'bakkie',   label: 'Bakkie / Pickup' },
+  { value: 'suv',      label: 'SUV / 4×4' },
+  { value: 'minivan',  label: 'Minivan / People Carrier' },
+  { value: 'other',    label: 'Other' },
+];
+
+const einputCls = 'w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring focus:ring-blue-200';
 
 const ROLE_LABELS: Record<string, string> = { driver: '🚗 Driver', admin: '🛡️ Admin' };
 const ROLE_PATHS: Record<string, string> = { driver: '/driver', admin: '/admin' };
 
 const ALL_ROLES = ['driver', 'admin'] as const;
 
+interface VehicleRecord {
+  make?: string;
+  model?: string;
+  colour?: string;
+  plate?: string;
+  vehicleType?: string;
+}
+
 interface UserRecord {
   uid: string;
+  firstName?: string;
+  lastName?: string;
   displayName: string;
   phone: string;
   email?: string;
-  role?: string;       // legacy single-role field
-  roles?: string[];    // new multi-role field
-  _roles: string[];    // normalised (computed on snapshot read)
+  role?: string;
+  roles?: string[];
+  _roles: string[];
   approved?: boolean;
   available?: boolean;
   createdAt?: any;
   approvedAt?: any;
   approvedBy?: string;
   fcmToken?: string;
+  vehicle?: VehicleRecord;
 }
 
 /* ─── Expandable user card ─── */
@@ -39,7 +61,57 @@ const UserCard: React.FC<{
   onReject: (uid: string) => void;
 }> = ({ u, actionUid, onApprove, onReject }) => {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [savingRole, setSavingRole] = useState(false);
+
+  // Edit state
+  const [editFirstName, setEditFirstName] = useState(u.firstName ?? '');
+  const [editLastName, setEditLastName]   = useState(u.lastName ?? '');
+  const [editPhone, setEditPhone]         = useState(u.phone ?? '');
+  const [editMake, setEditMake]           = useState(u.vehicle?.make ?? '');
+  const [editModel, setEditModel]         = useState(u.vehicle?.model ?? '');
+  const [editColour, setEditColour]       = useState(u.vehicle?.colour ?? '');
+  const [editPlate, setEditPlate]         = useState(u.vehicle?.plate ?? '');
+  const [editVehicleType, setEditVehicleType] = useState(u.vehicle?.vehicleType ?? 'sedan');
+
+  const startEdit = () => {
+    setEditFirstName(u.firstName ?? '');
+    setEditLastName(u.lastName ?? '');
+    setEditPhone(u.phone ?? '');
+    setEditMake(u.vehicle?.make ?? '');
+    setEditModel(u.vehicle?.model ?? '');
+    setEditColour(u.vehicle?.colour ?? '');
+    setEditPlate(u.vehicle?.plate ?? '');
+    setEditVehicleType(u.vehicle?.vehicleType ?? 'sedan');
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    setSavingEdit(true);
+    try {
+      const displayName = `${editFirstName.trim()} ${editLastName.trim()}`.trim() || u.displayName;
+      const update: Record<string, any> = {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim(),
+        displayName,
+        phone: editPhone.trim(),
+      };
+      if (u._roles.includes('driver')) {
+        update.vehicle = {
+          make: editMake.trim(),
+          model: editModel.trim(),
+          colour: editColour.trim(),
+          plate: editPlate.trim().toUpperCase(),
+          vehicleType: editVehicleType,
+        };
+      }
+      await updateDoc(doc(db, 'users', u.uid), update);
+      setEditing(false);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const toggleRole = async (r: string) => {
     setSavingRole(true);
@@ -99,8 +171,50 @@ const UserCard: React.FC<{
 
       {/* Expanded details */}
       {open && (
-        <div className="border-t px-4 py-3 bg-gray-50 space-y-2 text-sm text-gray-600">
-          <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+        <div className="border-t px-4 py-3 bg-gray-50 space-y-3 text-sm text-gray-600">
+
+          {/* Edit / view header */}
+          {editing ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Editing Profile</span>
+                <button onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Personal</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input className={einputCls} placeholder="First name" value={editFirstName} onChange={e => setEditFirstName(e.target.value)} />
+                  <input className={einputCls} placeholder="Last name" value={editLastName} onChange={e => setEditLastName(e.target.value)} />
+                </div>
+                <input className={einputCls} placeholder="Phone" type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+
+                {u._roles.includes('driver') && (
+                  <>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-1">Vehicle</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className={einputCls} placeholder="Make" value={editMake} onChange={e => setEditMake(e.target.value)} />
+                      <input className={einputCls} placeholder="Model" value={editModel} onChange={e => setEditModel(e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className={einputCls} placeholder="Colour" value={editColour} onChange={e => setEditColour(e.target.value)} />
+                      <input className={einputCls} placeholder="Reg Plate" value={editPlate} onChange={e => setEditPlate(e.target.value)} />
+                    </div>
+                    <select className={einputCls} value={editVehicleType} onChange={e => setEditVehicleType(e.target.value)}>
+                      {VEHICLE_TYPES.map(vt => <option key={vt.value} value={vt.value}>{vt.label}</option>)}
+                    </select>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="flex items-center gap-1.5 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-xl font-medium disabled:opacity-50 hover:bg-blue-700 transition"
+              >
+                <Save className="w-3.5 h-3.5" />{savingEdit ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-y-2 gap-x-4">
             <div className="flex items-center gap-2">
               <User className="w-3.5 h-3.5 text-gray-400" />
               <span className="text-gray-400 text-xs uppercase tracking-wide">Name</span>
@@ -183,6 +297,24 @@ const UserCard: React.FC<{
               </>
             )}
           </div>
+          )}
+
+          {/* Vehicle section — driver only, view mode */}
+          {u._roles.includes('driver') && u.vehicle && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" /> Vehicle</p>
+              <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+                <span className="text-gray-400 text-xs">Make / Model</span>
+                <span className="font-medium text-gray-800">{[u.vehicle.make, u.vehicle.model].filter(Boolean).join(' ') || '—'}</span>
+                <span className="text-gray-400 text-xs">Colour</span>
+                <span className="text-gray-800">{u.vehicle.colour || '—'}</span>
+                <span className="text-gray-400 text-xs">Reg Plate</span>
+                <span className="font-mono font-semibold text-gray-800 tracking-wider">{u.vehicle.plate || '—'}</span>
+                <span className="text-gray-400 text-xs">Type</span>
+                <span className="text-gray-800 capitalize">{u.vehicle.vehicleType || '—'}</span>
+              </div>
+            </div>
+          )}
 
           <div className="text-xs text-gray-400 pt-1 break-all">UID: {u.uid}</div>
 
@@ -190,25 +322,33 @@ const UserCard: React.FC<{
             <p className="text-xs text-gray-400">Push token registered ✓</p>
           )}
 
-          {/* Approve / Reject actions for pending drivers */}
-          {u._roles.includes('driver') && !u.approved && (
-            <div className="flex gap-2 pt-2 border-t">
-              <button
-                disabled={actionUid === u.uid}
-                onClick={(e) => { e.stopPropagation(); onApprove(u.uid); }}
-                className="flex items-center gap-1 rounded-xl bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50 hover:bg-emerald-700 transition"
-              >
-                <ShieldCheck className="w-4 h-4" /> Approve
-              </button>
-              <button
-                disabled={actionUid === u.uid}
-                onClick={(e) => { e.stopPropagation(); onReject(u.uid); }}
-                className="flex items-center gap-1 rounded-xl border border-red-200 text-red-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50 hover:bg-red-50 transition"
-              >
-                <UserX className="w-4 h-4" /> Reject
-              </button>
-            </div>
-          )}
+          {/* Action row: Edit + Approve/Reject */}
+          <div className="flex flex-wrap gap-2 pt-2 border-t">
+            <button
+              onClick={(e) => { e.stopPropagation(); startEdit(); }}
+              className="flex items-center gap-1 rounded-xl border border-gray-200 text-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-100 transition"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </button>
+            {u._roles.includes('driver') && !u.approved && (
+              <>
+                <button
+                  disabled={actionUid === u.uid}
+                  onClick={(e) => { e.stopPropagation(); onApprove(u.uid); }}
+                  className="flex items-center gap-1 rounded-xl bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50 hover:bg-emerald-700 transition"
+                >
+                  <ShieldCheck className="w-4 h-4" /> Approve
+                </button>
+                <button
+                  disabled={actionUid === u.uid}
+                  onClick={(e) => { e.stopPropagation(); onReject(u.uid); }}
+                  className="flex items-center gap-1 rounded-xl border border-red-200 text-red-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50 hover:bg-red-50 transition"
+                >
+                  <UserX className="w-4 h-4" /> Reject
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

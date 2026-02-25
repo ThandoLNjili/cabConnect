@@ -24,11 +24,23 @@ export interface DriverConfig {
   pinCode: string;
 }
 
+export interface Vehicle {
+  make: string;         // e.g. Toyota
+  model: string;        // e.g. Corolla
+  colour: string;       // e.g. White
+  plate: string;        // e.g. CA 123-456
+  vehicleType: 'sedan' | 'hatchback' | 'bakkie' | 'suv' | 'minivan' | 'other';
+}
+
 export interface DriverProfile {
   id?: string;
+  firstName?: string;
+  lastName?: string;
   displayName: string;
   phone: string;
   available: boolean;
   fcmToken?: string;
   role: string;
+  vehicle?: Vehicle;
+}
 }
