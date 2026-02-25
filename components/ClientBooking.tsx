@@ -23,6 +23,7 @@ const ClientBooking: React.FC = () => {
 
   // Check if any driver is available
   useEffect(() => {
+    console.log("Maps key:", import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
     const checkAvailableDrivers = async () => {
       const q = query(collection(db, 'users'), where('role', '==', 'driver'), where('available', '==', true));
       const snapshot = await getDocs(q);
