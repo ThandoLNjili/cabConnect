@@ -176,23 +176,49 @@ const RideStatus: React.FC = () => {
         )}
 
         {isAccepted && driver && (
-          <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-4">
+          <div className="bg-white rounded-2xl shadow-sm p-4 space-y-4">
+            <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               <h2 className="font-semibold text-gray-800">Driver on the way</h2>
             </div>
+
+            {/* Driver identity */}
             <div className="flex items-center gap-4">
               <div className="bg-emerald-100 rounded-full p-3 shrink-0">
                 <Car className="w-7 h-7 text-emerald-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900">{driver.displayName}</p>
+                <p className="font-semibold text-gray-900 text-lg">{driver.displayName}</p>
                 <p className="text-sm text-gray-500">{driver.phone}</p>
               </div>
             </div>
+
+            {/* Vehicle details */}
+            {driver.vehicle && (
+              <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-400 flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5" /> Vehicle
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <span className="text-gray-400">Make &amp; Model</span>
+                  <span className="font-medium text-gray-800">
+                    {[driver.vehicle.make, driver.vehicle.model].filter(Boolean).join(' ') || '—'}
+                  </span>
+                  <span className="text-gray-400">Colour</span>
+                  <span className="text-gray-800">{driver.vehicle.colour || '—'}</span>
+                  <span className="text-gray-400">Reg Plate</span>
+                  <span className="font-mono font-bold text-gray-900 tracking-widest uppercase">
+                    {driver.vehicle.plate || '—'}
+                  </span>
+                  <span className="text-gray-400">Type</span>
+                  <span className="text-gray-800 capitalize">{driver.vehicle.vehicleType || '—'}</span>
+                </div>
+              </div>
+            )}
+
             <a
               href={`tel:${driver.phone}`}
-              className="mt-4 flex items-center justify-center gap-2 w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium hover:bg-emerald-700 transition"
+              className="flex items-center justify-center gap-2 w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium hover:bg-emerald-700 transition"
             >
               <Phone className="w-4 h-4" /> Call Driver
             </a>

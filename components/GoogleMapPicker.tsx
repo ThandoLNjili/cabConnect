@@ -37,11 +37,25 @@ const PickerInner: React.FC<GoogleMapPickerProps> = ({ initial, onConfirm, onClo
   const [reversing, setReversing] = useState(false);
 
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
+  const acRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const userLocRef = useRef<google.maps.LatLngLiteral | null>(null);
 
   // Create geocoder once geocoding lib is ready
   useEffect(() => {
     if (geocodingLib) geocoderRef.current = new geocodingLib.Geocoder();
   }, [geocodingLib]);
+
+  // Helper: apply location bias to the autocomplete once we have a position
+  const applyAutocompleteBias = useCallback((pos: google.maps.LatLngLiteral) => {
+    if (!acRef.current || !window.google?.maps) return;
+    const R = 0.27; // ~30 km in degrees
+    acRef.current.setBounds(
+      new window.google.maps.LatLngBounds(
+        { lat: pos.lat - R, lng: pos.lng - R },
+        { lat: pos.lat + R, lng: pos.lng + R },
+      ),
+    );
+  }, []);
 
   const reverseGeocode = useCallback((pos: google.maps.LatLngLiteral) => {
     if (!geocoderRef.current) {
@@ -73,6 +87,9 @@ const PickerInner: React.FC<GoogleMapPickerProps> = ({ initial, onConfirm, onClo
     const ac = new placesLib.Autocomplete(searchInputRef.current, {
       fields: ['geometry', 'formatted_address'],
     });
+    acRef.current = ac;
+    // Apply bias immediately if we already have a position
+    if (userLocRef.current) applyAutocompleteBias(userLocRef.current);
     ac.addListener('place_changed', () => {
       const place = ac.getPlace();
       if (place.geometry?.location) {
@@ -86,7 +103,7 @@ const PickerInner: React.FC<GoogleMapPickerProps> = ({ initial, onConfirm, onClo
         map?.setZoom(16);
       }
     });
-  }, [placesLib, map]);
+  }, [placesLib, map, applyAutocompleteBias]);
 
   // Geolocate on open (skip if an initial location was supplied)
   useEffect(() => {
@@ -104,6 +121,8 @@ const PickerInner: React.FC<GoogleMapPickerProps> = ({ initial, onConfirm, onClo
     navigator.geolocation?.getCurrentPosition(
       ({ coords: gc }) => {
         const pos: google.maps.LatLngLiteral = { lat: gc.latitude, lng: gc.longitude };
+        userLocRef.current = pos;
+        applyAutocompleteBias(pos);
         setPinPos(pos);
         map.panTo(pos);
         tryGeocode(pos);
