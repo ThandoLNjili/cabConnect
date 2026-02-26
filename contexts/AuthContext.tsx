@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { FORCED_LOGOUT_KEY, getOrCreateSessionId } from '../utils/session';
 
 const ACTIVE_ROLE_KEY = 'cabconnect_active_role';
 
@@ -66,7 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    let profileUnsub: (() => void) | null = null;
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (profileUnsub) {
+        profileUnsub();
+        profileUnsub = null;
+      }
+
       if (!u) {
         setUser(null);
         setRoles([]);
@@ -76,26 +83,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      try {
-        const snap = await getDoc(doc(db, 'users', u.uid));
-        const profile = snap.exists() ? (snap.data() as UserProfile) : null;
-        const r = normaliseRoles(profile);
-        const saved = localStorage.getItem(ACTIVE_ROLE_KEY);
-        setUser(u);
-        setRoles(r);
-        setActiveRoleState(pickActiveRole(r, saved));
-        setApproved(profile?.approved ?? null);
-      } catch {
-        setUser(u);
-        setRoles([]);
-        setActiveRoleState(null);
-        setApproved(null);
-      } finally {
-        setBooting(false);
-      }
+      const sessionId = getOrCreateSessionId();
+      const userRef = doc(db, 'users', u.uid);
+      let isFirstSnapshot = true;
+
+      profileUnsub = onSnapshot(
+        userRef,
+        (snap) => {
+          const profile = snap.exists() ? (snap.data() as UserProfile & { activeSessionId?: string }) : null;
+          const activeSessionId = profile?.activeSessionId;
+
+          // Session enforcement: check if another device has claimed this account
+          if (activeSessionId && activeSessionId !== sessionId) {
+            // On first snapshot, ignore mismatch (race condition with claimSession write)
+            // Subsequent snapshots will enforce the check
+            if (!isFirstSnapshot) {
+              localStorage.removeItem(ACTIVE_ROLE_KEY);
+              localStorage.setItem(FORCED_LOGOUT_KEY, 'You have been signed out because this account was used on another device.');
+              signOut(auth);
+              return;
+            }
+          }
+
+          if (!activeSessionId) {
+            setDoc(userRef, {
+              activeSessionId: sessionId,
+              activeSessionAt: serverTimestamp(),
+            }, { merge: true }).catch(() => {});
+          }
+
+          const r = normaliseRoles(profile);
+          const saved = localStorage.getItem(ACTIVE_ROLE_KEY);
+          setUser(u);
+          setRoles(r);
+          setActiveRoleState(pickActiveRole(r, saved));
+          setApproved(profile?.approved ?? null);
+          setBooting(false);
+          isFirstSnapshot = false;
+        },
+        () => {
+          setUser(u);
+          setRoles([]);
+          setActiveRoleState(null);
+          setApproved(null);
+          setBooting(false);
+        },
+      );
     });
 
-    return () => unsub();
+    return () => {
+      if (profileUnsub) profileUnsub();
+      unsub();
+    };
   }, []);
 
   const logout = async () => {

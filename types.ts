@@ -43,4 +43,3 @@ export interface DriverProfile {
   role: string;
   vehicle?: Vehicle;
 }
-}

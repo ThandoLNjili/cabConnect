@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
+import { getOrCreateSessionId } from '../utils/session';
 import {
   ShieldCheck, UserX, LogOut, Users, User, ChevronDown, ChevronUp,
   Phone, Mail, Clock, Wifi, WifiOff, AlertCircle, Car, Pencil, Save, X,
@@ -715,6 +716,7 @@ const AdminDashboard: React.FC = () => {
   const [allUsers, setAllUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionUid, setActionUid] = useState<string | null>(null);
+  const [signingOutOthers, setSigningOutOthers] = useState(false);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'admin'>('all');
   const [activeTab, setActiveTab] = useState<'users' | 'rides' | 'settings'>('users');
 
@@ -758,6 +760,20 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const signOutOtherDevices = async () => {
+    if (!adminUid) return;
+    setSigningOutOthers(true);
+    try {
+      const sessionId = getOrCreateSessionId();
+      await updateDoc(doc(db, 'users', adminUid), {
+        activeSessionId: sessionId,
+        activeSessionAt: serverTimestamp(),
+      });
+    } finally {
+      setSigningOutOthers(false);
+    }
+  };
+
   const pendingDrivers = allUsers.filter(u => u._roles.includes('driver') && !u.approved);
   const approvedDrivers = allUsers.filter(u => u._roles.includes('driver') && u.approved);
   const admins = allUsers.filter(u => u._roles.includes('admin'));
@@ -796,9 +812,18 @@ const AdminDashboard: React.FC = () => {
               </p>
               <p className="text-sm text-gray-500 truncate">{user?.email || '—'}</p>
             </div>
-            <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
-              Admin
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                Admin
+              </span>
+              <button
+                onClick={signOutOtherDevices}
+                disabled={signingOutOthers || !adminUid}
+                className="text-xs font-semibold px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+              >
+                {signingOutOthers ? 'Signing out…' : 'Sign out other devices'}
+              </button>
+            </div>
           </div>
           {roles.length >= 2 && (
             <div className="border-t flex">

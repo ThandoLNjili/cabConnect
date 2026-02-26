@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { Lock, Mail, KeyRound } from 'lucide-react';
+import { FORCED_LOGOUT_KEY, getOrCreateSessionId } from '../utils/session';
 
 type UserProfile = {
   role?: string;
@@ -26,10 +27,20 @@ const DriverLogin: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const reason = localStorage.getItem(FORCED_LOGOUT_KEY);
+    if (reason) {
+      setNotice(reason);
+      localStorage.removeItem(FORCED_LOGOUT_KEY);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
 
     try {
@@ -46,8 +57,17 @@ const DriverLogin: React.FC = () => {
         throw new Error('This account has no assigned role.');
       }
 
+      const claimSession = async () => {
+        const sessionId = getOrCreateSessionId();
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          activeSessionId: sessionId,
+          activeSessionAt: serverTimestamp(),
+        }, { merge: true });
+      };
+
       // Multi-role: admin takes priority for initial landing
       if (roles.includes('admin')) {
+        await claimSession();
         navigate('/admin', { replace: true });
         return;
       }
@@ -58,10 +78,12 @@ const DriverLogin: React.FC = () => {
       }
 
       if (profile?.approved === false) {
+        await claimSession();
         navigate('/pending', { replace: true });
         return;
       }
 
+      await claimSession();
       navigate('/driver', { replace: true });
     } catch (err: any) {
       const msg =
@@ -115,6 +137,12 @@ const DriverLogin: React.FC = () => {
               autoComplete="current-password"
             />
           </label>
+
+          {notice && (
+            <div className="rounded-xl bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 text-sm">
+              {notice}
+            </div>
+          )}
 
           {error && (
             <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-3 py-2 text-sm">
