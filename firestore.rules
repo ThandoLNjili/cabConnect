@@ -49,5 +49,12 @@ service cloud.firestore {
         allow update, delete: if false;
       }
     }
+
+    // Settings — any authenticated user can read (drivers need timeout value);
+    // writes are authenticated only (admin-layer enforcement at the app level).
+    match /settings/{settingId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
   }
 }

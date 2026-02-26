@@ -1,7 +1,7 @@
 import { registerFCMToken } from '../utils/registerFCMToken';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { collection, doc, addDoc, onSnapshot, query, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, addDoc, onSnapshot, query, orderBy, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db, auth } from '../firebase';
@@ -144,6 +144,35 @@ const DriverDashboard: React.FC = () => {
       setLoading(false);
     });
     return () => unsub();
+  }, []);
+
+  // Client-side inactivity timeout check on mount
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const checkTimeout = async () => {
+      try {
+        const [userSnap, settingsSnap] = await Promise.all([
+          getDoc(doc(db, 'users', user.uid)),
+          getDoc(doc(db, 'settings', 'driverTimeout')),
+        ]);
+        if (!userSnap.exists()) return;
+        const data = userSnap.data();
+        if (!data.available) return; // already offline
+        const timeoutHours: number = settingsSnap.exists() ? (settingsSnap.data().hours ?? 2) : 2;
+        const lastUpdate: Date = data.lastAvailableUpdate?.toDate?.() ?? new Date(0);
+        const cutoffMs = Date.now() - timeoutHours * 60 * 60 * 1000;
+        if (lastUpdate.getTime() < cutoffMs) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            available: false,
+            timedOutAt: serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        // silently ignore — offline or permission error
+      }
+    };
+    checkTimeout();
   }, []);
 
   // Subscribe to ride requests (pending and accepted by this driver)

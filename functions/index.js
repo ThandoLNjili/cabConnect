@@ -1,4 +1,5 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 admin.initializeApp();
 
@@ -58,3 +59,41 @@ exports.notifyDriversOnNewRide = onDocumentCreated(
 
     return null;
   });
+
+// ── Scheduled: auto-timeout drivers who have been online too long without activity ──
+// Reads the timeout threshold from settings/driverTimeout (default 2 hours).
+// Any driver with available=true whose lastAvailableUpdate is older than the threshold
+// is set offline automatically.
+exports.timeoutInactiveDrivers = onSchedule(
+  { schedule: 'every 30 minutes', timeZone: 'Africa/Johannesburg' },
+  async () => {
+    const settingsDoc = await db.collection('settings').doc('driverTimeout').get();
+    const timeoutHours = settingsDoc.exists ? (settingsDoc.data().hours ?? 2) : 2;
+    const cutoffMs = Date.now() - timeoutHours * 60 * 60 * 1000;
+
+    const onlineSnap = await db.collection('users')
+      .where('available', '==', true)
+      .get();
+
+    const updates = [];
+    for (const d of onlineSnap.docs) {
+      const lastUpdate = d.data().lastAvailableUpdate?.toDate?.() ?? new Date(0);
+      if (lastUpdate.getTime() < cutoffMs) {
+        updates.push(
+          d.ref.update({
+            available: false,
+            timedOutAt: admin.firestore.FieldValue.serverTimestamp(),
+          })
+        );
+      }
+    }
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.log(`Timed out ${updates.length} inactive driver(s) (threshold: ${timeoutHours}h).`);
+    } else {
+      console.log('No inactive drivers to time out.');
+    }
+    return null;
+  }
+);

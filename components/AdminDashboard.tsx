@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  collection, query, where, onSnapshot, updateDoc, deleteDoc, doc, serverTimestamp, orderBy,
+  collection, query, onSnapshot, updateDoc, deleteDoc, doc,
+  serverTimestamp, orderBy, getDoc, setDoc, getDocs,
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,7 +9,7 @@ import { db } from '../firebase';
 import {
   ShieldCheck, UserX, LogOut, Users, User, ChevronDown, ChevronUp,
   Phone, Mail, Clock, Wifi, WifiOff, AlertCircle, Car, Pencil, Save, X,
-  MapPin, Navigation, SlidersHorizontal, ArrowDownUp,
+  MapPin, Navigation, SlidersHorizontal, ArrowDownUp, Settings2, Timer, CheckCheck,
 } from 'lucide-react';
 
 const VEHICLE_TYPES = [
@@ -26,243 +27,6 @@ const ROLE_LABELS: Record<string, string> = { driver: '🚗 Driver', admin: '�
 const ROLE_PATHS: Record<string, string> = { driver: '/driver', admin: '/admin' };
 
 const ALL_ROLES = ['driver', 'admin'] as const;
-
-/* ─── Rides tab types & constants ─── */
-interface RideRecord {
-  id: string;
-  customerName: string;
-  phone: string;
-  pickup: string;
-  dropoff: string;
-  status: string;
-  driverId?: string;
-  timestamp?: any;
-  acceptedAt?: any;
-  completedAt?: any;
-  cancelledAt?: any;
-  cancelledBy?: string;
-}
-
-const RIDE_STATUS_FILTERS = [
-  { key: 'all',       label: 'All' },
-  { key: 'pending',   label: 'Pending' },
-  { key: 'accepted',  label: 'Accepted' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'cancelled', label: 'Cancelled' },
-] as const;
-
-type RideStatusFilter = typeof RIDE_STATUS_FILTERS[number]['key'];
-
-const RIDE_STATUS_STYLES: Record<string, string> = {
-  pending:   'bg-blue-50 text-blue-700',
-  accepted:  'bg-emerald-50 text-emerald-700',
-  completed: 'bg-gray-100 text-gray-600',
-  cancelled: 'bg-red-50 text-red-600',
-};
-
-const RIDE_PILL_ACTIVE: Record<string, string> = {
-  all:       'bg-gray-800 text-white',
-  pending:   'bg-blue-500 text-white',
-  accepted:  'bg-emerald-500 text-white',
-  completed: 'bg-gray-500 text-white',
-  cancelled: 'bg-red-500 text-white',
-};
-
-const RIDE_BORDER: Record<string, string> = {
-  pending:   'border-blue-400',
-  accepted:  'border-emerald-400',
-  completed: 'border-gray-300',
-  cancelled: 'border-red-300',
-};
-
-const fmtTs = (ts: any): string => {
-  if (!ts) return '—';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
-    + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
-
-/* ─── Rides Tab ─── */
-const RidesTab: React.FC<{ allUsers: UserRecord[] }> = ({ allUsers }) => {
-  const [rides, setRides] = useState<RideRecord[]>([]);
-  const [ridesLoading, setRidesLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<RideStatusFilter>('all');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [expanded, setExpanded] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsub = onSnapshot(
-      query(collection(db, 'requests'), orderBy('timestamp', 'desc')),
-      (snap) => {
-        setRides(snap.docs.map(d => ({ id: d.id, ...d.data() } as RideRecord)));
-        setRidesLoading(false);
-      }
-    );
-    return () => unsub();
-  }, []);
-
-  const driverLabel = (driverId?: string) => {
-    if (!driverId) return null;
-    const u = allUsers.find(u => u.uid === driverId);
-    return u?.displayName ?? driverId.slice(0, 8) + '…';
-  };
-
-  const filtered = rides
-    .filter(r => statusFilter === 'all' || r.status === statusFilter)
-    .sort((a, b) => {
-      const ta = a.timestamp?.toDate?.()?.getTime() ?? 0;
-      const tb = b.timestamp?.toDate?.()?.getTime() ?? 0;
-      return sortOrder === 'desc' ? tb - ta : ta - tb;
-    });
-
-  const counts: Record<RideStatusFilter, number> = {
-    all:       rides.length,
-    pending:   rides.filter(r => r.status === 'pending').length,
-    accepted:  rides.filter(r => r.status === 'accepted').length,
-    completed: rides.filter(r => r.status === 'completed').length,
-    cancelled: rides.filter(r => r.status === 'cancelled').length,
-  };
-
-  return (
-    <div className="space-y-3">
-      {/* Filter + sort row */}
-      <div className="flex items-center gap-2">
-        <SlidersHorizontal className="w-4 h-4 text-gray-400 shrink-0" />
-        <div className="flex gap-1.5 overflow-x-auto flex-1" style={{ scrollbarWidth: 'none' }}>
-          {RIDE_STATUS_FILTERS.map(sf => (
-            <button
-              key={sf.key}
-              onClick={() => setStatusFilter(sf.key)}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${
-                statusFilter === sf.key
-                  ? RIDE_PILL_ACTIVE[sf.key]
-                  : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {sf.label} <span className="opacity-70">{counts[sf.key]}</span>
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
-          className="shrink-0 flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition"
-          title={sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
-        >
-          <ArrowDownUp className="w-3.5 h-3.5" />
-          {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
-        </button>
-      </div>
-
-      {ridesLoading ? (
-        <p className="text-center text-gray-400 text-sm pt-8">Loading rides…</p>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-          <Car className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No rides in this category.</p>
-        </div>
-      ) : (
-        filtered.map(ride => {
-          const isOpen = expanded === ride.id;
-          const driver = driverLabel(ride.driverId);
-          return (
-            <div
-              key={ride.id}
-              className={`bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 ${
-                RIDE_BORDER[ride.status] ?? 'border-gray-200'
-              }`}
-            >
-              <button
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition"
-                onClick={() => setExpanded(isOpen ? null : ride.id)}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="font-semibold text-gray-900 truncate">{ride.customerName}</p>
-                    <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${
-                      RIDE_STATUS_STYLES[ride.status] ?? 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {ride.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-400 truncate">{ride.pickup} → {ride.dropoff}</p>
-                </div>
-                <span className="text-xs text-gray-400 shrink-0">{fmtTs(ride.timestamp).split(' · ')[1] ?? ''}</span>
-                {isOpen
-                  ? <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
-                  : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
-                }
-              </button>
-
-              {isOpen && (
-                <div className="border-t px-4 py-3 bg-gray-50 space-y-3 text-sm text-gray-700">
-                  {/* Route */}
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <Navigation className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
-                      <div>
-                        <span className="text-xs text-gray-400 uppercase font-bold block">Pickup</span>
-                        {ride.pickup}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-                      <div>
-                        <span className="text-xs text-gray-400 uppercase font-bold block">Dropoff</span>
-                        {ride.dropoff}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Details grid */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                    <span className="text-gray-400 text-xs">Customer</span>
-                    <span className="font-medium text-gray-800">{ride.customerName}</span>
-
-                    <span className="text-gray-400 text-xs">Phone</span>
-                    <a href={`tel:${ride.phone}`} className="text-blue-600 hover:underline">{ride.phone}</a>
-
-                    {driver && (
-                      <>
-                        <span className="text-gray-400 text-xs">Driver</span>
-                        <span className="text-gray-800">{driver}</span>
-                      </>
-                    )}
-
-                    <span className="text-gray-400 text-xs">Requested</span>
-                    <span className="text-gray-800">{fmtTs(ride.timestamp)}</span>
-
-                    {ride.acceptedAt && (
-                      <>
-                        <span className="text-gray-400 text-xs">Accepted</span>
-                        <span className="text-gray-800">{fmtTs(ride.acceptedAt)}</span>
-                      </>
-                    )}
-                    {ride.completedAt && (
-                      <>
-                        <span className="text-gray-400 text-xs">Completed</span>
-                        <span className="text-gray-800">{fmtTs(ride.completedAt)}</span>
-                      </>
-                    )}
-                    {ride.cancelledAt && (
-                      <>
-                        <span className="text-gray-400 text-xs">Cancelled</span>
-                        <span className="text-gray-800">
-                          {fmtTs(ride.cancelledAt)}{ride.cancelledBy ? ` · by ${ride.cancelledBy}` : ''}
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-gray-400 break-all">ID: {ride.id}</p>
-                </div>
-              )}
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-};
 
 interface VehicleRecord {
   make?: string;
@@ -593,6 +357,355 @@ const UserCard: React.FC<{
   );
 };
 
+/* ─── Settings Tab ─── */
+const SettingsTab: React.FC<{ allUsers: UserRecord[] }> = ({ allUsers }) => {
+  const [timeoutHours, setTimeoutHours] = useState<number>(2);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'driverTimeout')).then((snap) => {
+      if (snap.exists()) setTimeoutHours(snap.data().hours ?? 2);
+      setLoaded(true);
+    });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'driverTimeout'), { hours: timeoutHours });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runCheck = async () => {
+    setChecking(true);
+    setCheckResult(null);
+    try {
+      const cutoffMs = Date.now() - timeoutHours * 60 * 60 * 1000;
+      const snap = await getDocs(collection(db, 'users'));
+      const updates: Promise<void>[] = [];
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (!data.available) return;
+        const lastUpdate: Date = data.lastAvailableUpdate?.toDate?.() ?? new Date(0);
+        if (lastUpdate.getTime() < cutoffMs) {
+          updates.push(
+            updateDoc(doc(db, 'users', d.id), {
+              available: false,
+              timedOutAt: serverTimestamp(),
+            })
+          );
+        }
+      });
+      await Promise.all(updates);
+      setCheckResult(
+        updates.length > 0
+          ? `Signed out ${updates.length} inactive driver${updates.length > 1 ? 's' : ''}.`
+          : 'All online drivers are within the activity window.'
+      );
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const onlineCount = allUsers.filter(u => u._roles.includes('driver') && u.available).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-sm p-4 space-y-4">
+        <div className="flex items-center gap-2">
+          <Timer className="w-5 h-5 text-blue-600" />
+          <h2 className="font-semibold text-gray-800">Driver Inactivity Timeout</h2>
+        </div>
+        <p className="text-sm text-gray-500">
+          Drivers are automatically signed out after being online for this long without
+          toggling their status. A cloud function enforces this every 30 minutes.
+        </p>
+        {!loaded ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700 shrink-0">Timeout after</label>
+              <select
+                value={timeoutHours}
+                onChange={(e) => setTimeoutHours(Number(e.target.value))}
+                className={`${einputCls} flex-1`}
+              >
+                {[1, 2, 4, 6, 8, 12, 24].map(h => (
+                  <option key={h} value={h}>{h} hour{h > 1 ? 's' : ''}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="flex items-center gap-1.5 bg-blue-600 text-white text-sm px-4 py-2 rounded-xl font-medium disabled:opacity-50 hover:bg-blue-700 transition"
+            >
+              <Save className="w-4 h-4" />{saving ? 'Saving…' : 'Save Setting'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <CheckCheck className="w-5 h-5 text-emerald-600" />
+          <h2 className="font-semibold text-gray-800">Run Check Now</h2>
+        </div>
+        <p className="text-sm text-gray-500">
+          Manually scan all online drivers and sign out any who have been idle longer than
+          the configured timeout.
+          <span className="block mt-1 text-blue-700 font-medium">{onlineCount} driver{onlineCount !== 1 ? 's' : ''} currently online.</span>
+        </p>
+        <button
+          onClick={runCheck}
+          disabled={checking || !loaded}
+          className="flex items-center gap-1.5 bg-emerald-600 text-white text-sm px-4 py-2 rounded-xl font-medium disabled:opacity-50 hover:bg-emerald-700 transition"
+        >
+          <Timer className="w-4 h-4" />{checking ? 'Checking…' : 'Check Drivers Now'}
+        </button>
+        {checkResult && (
+          <p className="text-sm text-gray-700 bg-gray-50 border rounded-xl px-3 py-2">{checkResult}</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ─── Rides tab types & constants ─── */
+interface RideRecord {
+  id: string;
+  customerName: string;
+  phone: string;
+  pickup: string;
+  dropoff: string;
+  status: string;
+  driverId?: string;
+  timestamp?: any;
+  acceptedAt?: any;
+  completedAt?: any;
+  cancelledAt?: any;
+  cancelledBy?: string;
+}
+
+const RIDE_STATUS_FILTERS = [
+  { key: 'all',       label: 'All' },
+  { key: 'pending',   label: 'Pending' },
+  { key: 'accepted',  label: 'Accepted' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'cancelled', label: 'Cancelled' },
+] as const;
+
+type RideStatusFilter = typeof RIDE_STATUS_FILTERS[number]['key'];
+
+const RIDE_STATUS_STYLES: Record<string, string> = {
+  pending:   'bg-blue-50 text-blue-700',
+  accepted:  'bg-emerald-50 text-emerald-700',
+  completed: 'bg-gray-100 text-gray-600',
+  cancelled: 'bg-red-50 text-red-600',
+};
+
+const RIDE_PILL_ACTIVE: Record<string, string> = {
+  all:       'bg-gray-800 text-white',
+  pending:   'bg-blue-500 text-white',
+  accepted:  'bg-emerald-500 text-white',
+  completed: 'bg-gray-500 text-white',
+  cancelled: 'bg-red-500 text-white',
+};
+
+const RIDE_BORDER: Record<string, string> = {
+  pending:   'border-blue-400',
+  accepted:  'border-emerald-400',
+  completed: 'border-gray-300',
+  cancelled: 'border-red-300',
+};
+
+const fmtTs = (ts: any): string => {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
+    + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+/* ─── Rides Tab ─── */
+const RidesTab: React.FC<{ allUsers: UserRecord[] }> = ({ allUsers }) => {
+  const [rides, setRides] = useState<RideRecord[]>([]);
+  const [ridesLoading, setRidesLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<RideStatusFilter>('all');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'requests'), orderBy('timestamp', 'desc')),
+      (snap) => {
+        setRides(snap.docs.map(d => ({ id: d.id, ...d.data() } as RideRecord)));
+        setRidesLoading(false);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  const driverLabel = (driverId?: string) => {
+    if (!driverId) return null;
+    const u = allUsers.find(u => u.uid === driverId);
+    return u?.displayName ?? driverId.slice(0, 8) + '…';
+  };
+
+  const filtered = rides
+    .filter(r => statusFilter === 'all' || r.status === statusFilter)
+    .sort((a, b) => {
+      const ta = a.timestamp?.toDate?.()?.getTime() ?? 0;
+      const tb = b.timestamp?.toDate?.()?.getTime() ?? 0;
+      return sortOrder === 'desc' ? tb - ta : ta - tb;
+    });
+
+  const counts: Record<RideStatusFilter, number> = {
+    all:       rides.length,
+    pending:   rides.filter(r => r.status === 'pending').length,
+    accepted:  rides.filter(r => r.status === 'accepted').length,
+    completed: rides.filter(r => r.status === 'completed').length,
+    cancelled: rides.filter(r => r.status === 'cancelled').length,
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <SlidersHorizontal className="w-4 h-4 text-gray-400 shrink-0" />
+        <div className="flex gap-1.5 overflow-x-auto flex-1" style={{ scrollbarWidth: 'none' }}>
+          {RIDE_STATUS_FILTERS.map(sf => (
+            <button
+              key={sf.key}
+              onClick={() => setStatusFilter(sf.key)}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                statusFilter === sf.key
+                  ? RIDE_PILL_ACTIVE[sf.key]
+                  : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {sf.label} <span className="opacity-70">{counts[sf.key]}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+          className="shrink-0 flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition"
+        >
+          <ArrowDownUp className="w-3.5 h-3.5" />
+          {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
+        </button>
+      </div>
+
+      {ridesLoading ? (
+        <p className="text-center text-gray-400 text-sm pt-8">Loading rides…</p>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
+          <Car className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">No rides in this category.</p>
+        </div>
+      ) : (
+        filtered.map(ride => {
+          const isOpen = expanded === ride.id;
+          const driver = driverLabel(ride.driverId);
+          return (
+            <div
+              key={ride.id}
+              className={`bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 ${
+                RIDE_BORDER[ride.status] ?? 'border-gray-200'
+              }`}
+            >
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition"
+                onClick={() => setExpanded(isOpen ? null : ride.id)}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="font-semibold text-gray-900 truncate">{ride.customerName}</p>
+                    <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${
+                      RIDE_STATUS_STYLES[ride.status] ?? 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {ride.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 truncate">{ride.pickup} → {ride.dropoff}</p>
+                </div>
+                <span className="text-xs text-gray-400 shrink-0">
+                  {fmtTs(ride.timestamp).split(' · ')[1] ?? ''}
+                </span>
+                {isOpen
+                  ? <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
+                  : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                }
+              </button>
+
+              {isOpen && (
+                <div className="border-t px-4 py-3 bg-gray-50 space-y-3 text-sm text-gray-700">
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <Navigation className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-xs text-gray-400 uppercase font-bold block">Pickup</span>
+                        {ride.pickup}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-xs text-gray-400 uppercase font-bold block">Dropoff</span>
+                        {ride.dropoff}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    <span className="text-gray-400 text-xs">Customer</span>
+                    <span className="font-medium text-gray-800">{ride.customerName}</span>
+                    <span className="text-gray-400 text-xs">Phone</span>
+                    <a href={`tel:${ride.phone}`} className="text-blue-600 hover:underline">{ride.phone}</a>
+                    {driver && (
+                      <>
+                        <span className="text-gray-400 text-xs">Driver</span>
+                        <span className="text-gray-800">{driver}</span>
+                      </>
+                    )}
+                    <span className="text-gray-400 text-xs">Requested</span>
+                    <span className="text-gray-800">{fmtTs(ride.timestamp)}</span>
+                    {ride.acceptedAt && (
+                      <>
+                        <span className="text-gray-400 text-xs">Accepted</span>
+                        <span className="text-gray-800">{fmtTs(ride.acceptedAt)}</span>
+                      </>
+                    )}
+                    {ride.completedAt && (
+                      <>
+                        <span className="text-gray-400 text-xs">Completed</span>
+                        <span className="text-gray-800">{fmtTs(ride.completedAt)}</span>
+                      </>
+                    )}
+                    {ride.cancelledAt && (
+                      <>
+                        <span className="text-gray-400 text-xs">Cancelled</span>
+                        <span className="text-gray-800">
+                          {fmtTs(ride.cancelledAt)}{ride.cancelledBy ? ` · by ${ride.cancelledBy}` : ''}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 break-all">ID: {ride.id}</p>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+};
+
 /* ─── Admin Dashboard ─── */
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -603,7 +716,7 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [actionUid, setActionUid] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'admin'>('all');
-  const [activeTab, setActiveTab] = useState<'users' | 'rides'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'rides' | 'settings'>('users');
 
   // Subscribe to ALL users
   useEffect(() => {
@@ -728,9 +841,18 @@ const AdminDashboard: React.FC = () => {
           >
             <Car className="w-4 h-4" /> Rides
           </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition ${
+              activeTab === 'settings' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <Settings2 className="w-4 h-4" /> Settings
+          </button>
         </div>
 
         {activeTab === 'rides' && <RidesTab allUsers={allUsers} />}
+        {activeTab === 'settings' && <SettingsTab allUsers={allUsers} />}
 
         {activeTab === 'users' && (<>
         {/* Stat pills */}
