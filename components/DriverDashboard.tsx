@@ -150,9 +150,11 @@ const DriverDashboard: React.FC = () => {
 
   useEffect(() => {
     return onMessage(messaging, async (payload) => {
+      // Messages are data-only; title/body are in payload.data.
+      const data = payload.data ?? {};
       const notification = payload.notification ?? {};
-      const title = notification.title ?? 'New notification';
-      const body = notification.body ?? '';
+      const title = data.title ?? notification.title ?? 'New notification';
+      const body = data.body ?? notification.body ?? '';
 
       console.log('Foreground FCM message received:', payload);
 

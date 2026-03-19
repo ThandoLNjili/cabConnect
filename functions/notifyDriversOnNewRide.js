@@ -7,13 +7,26 @@ exports.notifyDriversOnNewRide = functions.firestore
   .document('requests/{requestId}')
   .onCreate(async (snap, context) => {
     const ride = snap.data();
-    // Find all available drivers
-    const driversSnapshot = await admin.firestore().collection('users')
-      .where('role', '==', 'driver')
-      .where('available', '==', true)
-      .get();
-    const tokens = driversSnapshot.docs
-      .map(doc => doc.data().fcmToken)
+    // Find all available drivers.
+    // Two queries are needed: legacy users have a single `role` field,
+    // while multi-role users (e.g. admin/driver) use a `roles` array.
+    const db = admin.firestore();
+    const [legacySnap, multiSnap] = await Promise.all([
+      db.collection('users').where('role', '==', 'driver').where('available', '==', true).get(),
+      db.collection('users').where('roles', 'array-contains', 'driver').where('available', '==', true).get(),
+    ]);
+    const seenIds = new Set();
+    const allDocs = [];
+    for (const snap of [legacySnap, multiSnap]) {
+      for (const d of snap.docs) {
+        if (!seenIds.has(d.id)) {
+          seenIds.add(d.id);
+          allDocs.push(d);
+        }
+      }
+    }
+    const tokens = allDocs
+      .map(d => d.data().fcmToken)
       .filter(token => !!token);
     if (tokens.length === 0) return null;
     // Compose notification
