@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { addDoc, collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { Car, MapPin, Navigation, Send, Loader2, ChevronRight } from 'lucide-react';
@@ -21,15 +21,33 @@ const ClientBooking: React.FC = () => {
   const [pickupLoc, setPickupLoc] = useState<PickedLocation | null>(null);
   const [dropoffLoc, setDropoffLoc] = useState<PickedLocation | null>(null);
 
-  // Check if any driver is available
+  // Check if any driver is available — two queries to cover both legacy single-role
+  // users (role == 'driver') and multi-role users (roles array-contains 'driver').
   useEffect(() => {
-    const checkAvailableDrivers = async () => {
-      const q = query(collection(db, 'users'), where('role', '==', 'driver'), where('available', '==', true));
-      const snapshot = await getDocs(q);
-      setIsDriverAvailable(!snapshot.empty);
+    const legacyQ = query(collection(db, 'users'), where('role', '==', 'driver'), where('available', '==', true));
+    const multiQ = query(collection(db, 'users'), where('roles', 'array-contains', 'driver'), where('available', '==', true));
+
+    let legacyDocs: Record<string, true> = {};
+    let multiDocs: Record<string, true> = {};
+
+    const evaluate = () => {
+      const allIds = new Set([...Object.keys(legacyDocs), ...Object.keys(multiDocs)]);
+      setIsDriverAvailable(allIds.size > 0);
       setLoading(false);
     };
-    checkAvailableDrivers();
+
+    const unsubLegacy = onSnapshot(legacyQ, (snap) => {
+      legacyDocs = {};
+      snap.docs.forEach(d => { legacyDocs[d.id] = true; });
+      evaluate();
+    });
+    const unsubMulti = onSnapshot(multiQ, (snap) => {
+      multiDocs = {};
+      snap.docs.forEach(d => { multiDocs[d.id] = true; });
+      evaluate();
+    });
+
+    return () => { unsubLegacy(); unsubMulti(); };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
