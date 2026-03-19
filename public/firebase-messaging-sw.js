@@ -1,8 +1,8 @@
 /* eslint-disable no-undef */
 // Firebase Cloud Messaging service worker
 
-importScripts('https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.6.11/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
 firebase.initializeApp({
   apiKey: "AIzaSyCNQaTYYDvt-ETlEZ7b8CiK1QG4vGynJDo",
@@ -32,10 +32,14 @@ self.addEventListener('message', (event) => {
 });
 
 messaging.onBackgroundMessage((payload) => {
+  // Data-only messages store title/body in payload.data.
+  // Fall back to payload.notification for any legacy notification-type messages.
+  const data = payload.data || {};
   const notification = payload.notification || {};
-  const title = notification.title || 'New notification';
+  const title = data.title || notification.title || 'New notification';
+  const body = data.body || notification.body || '';
   const options = {
-    body: notification.body || '',
+    body,
     icon: `${appBasePath}favicon.svg`,
     badge: `${appBasePath}favicon.svg`,
     data: {

@@ -17,12 +17,16 @@ exports.notifyDriversOnNewRide = functions.firestore
       .filter(token => !!token);
     if (tokens.length === 0) return null;
     // Compose notification
+    const title = 'New Ride Request';
+    const body = `${ride.customerName} needs a ride from ${ride.pickup} to ${ride.dropoff}`;
+    // Use a data-only message (no top-level "notification" key).
+    // Notification-type messages can be auto-consumed by the FCM SDK on web,
+    // bypassing onBackgroundMessage and silently failing to show in the
+    // background. Data-only messages always reach onBackgroundMessage, where
+    // the service worker calls showNotification() explicitly.
     const message = {
-      notification: {
-        title: 'New Ride Request',
-        body: `${ride.customerName} needs a ride from ${ride.pickup} to ${ride.dropoff}`
-      },
-      tokens: tokens
+      data: { title, body },
+      tokens: tokens,
     };
     // Send notification
     return admin.messaging().sendMulticast(message);
