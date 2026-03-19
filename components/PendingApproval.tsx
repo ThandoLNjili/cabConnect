@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Clock } from 'lucide-react';
+import { currentBuild } from '../utils/appVersion';
 
 const PendingApproval: React.FC = () => {
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ const PendingApproval: React.FC = () => {
         >
           Sign out
         </button>
+        <p className="mt-4 text-xs text-gray-300 select-none">v{currentBuild.version}</p>
       </div>
     </div>
   );

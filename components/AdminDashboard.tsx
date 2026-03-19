@@ -3,6 +3,7 @@ import {
   collection, query, onSnapshot, updateDoc, deleteDoc, doc,
   serverTimestamp, orderBy, getDoc, setDoc, getDocs,
 } from 'firebase/firestore';
+import { currentBuild } from '../utils/appVersion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
@@ -932,6 +933,8 @@ const AdminDashboard: React.FC = () => {
         )}
         </>)}
       </div>
+
+      <p className="mt-6 text-center text-xs text-gray-300 select-none">v{currentBuild.version}</p>
     </div>
   );
 };

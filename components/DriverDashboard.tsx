@@ -1,4 +1,5 @@
 import { registerFCMToken } from '../utils/registerFCMToken';
+import { currentBuild } from '../utils/appVersion';
 
 import React, { useEffect, useRef, useState } from 'react';
 import { onMessage } from 'firebase/messaging';
@@ -486,6 +487,8 @@ const DriverDashboard: React.FC = () => {
         )}
 
       </div>
+
+      <p className="mt-6 text-center text-xs text-gray-300 select-none">v{currentBuild.version}</p>
     </div>
   );
 };
