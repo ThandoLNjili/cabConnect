@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 
+import AppUpdateBanner from './components/AppUpdateBanner';
 import DriverDashboard from './components/DriverDashboard';
 import ClientBooking from './components/ClientBooking';
 import DriverLogin from './components/DriverLogin';
@@ -9,9 +10,11 @@ import DriverRegister from './components/DriverRegister';
 import PendingApproval from './components/PendingApproval';
 import AdminDashboard from './components/AdminDashboard';
 import RideStatus from './components/RideStatus';
+import { useAppUpdate } from './utils/useAppUpdate';
 
 function App() {
   const { user, roles, approved, booting } = useAuth();
+  const appUpdate = useAppUpdate();
 
   if (booting) {
     return (
@@ -23,6 +26,13 @@ function App() {
 
   return (
     <div className="font-sans text-gray-900">
+      {appUpdate.updateAvailable && appUpdate.latestBuild && (
+        <AppUpdateBanner
+          latestBuild={appUpdate.latestBuild}
+          onApply={appUpdate.applyUpdate}
+          onDismiss={appUpdate.dismissUpdate}
+        />
+      )}
       <Routes>
         {/* Public passenger booking page */}
         <Route path="/" element={<ClientBooking />} />

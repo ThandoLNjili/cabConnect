@@ -21,9 +21,14 @@ exports.notifyDriversOnNewRide = onDocumentCreated(
       .where('available', '==', true)
       .get();
 
-    const tokens = driversSnapshot.docs
-      .map(d => d.data().fcmToken)
-      .filter(t => typeof t === 'string' && t.length > 0);
+    const driversWithTokens = driversSnapshot.docs
+      .map((driverDoc) => ({
+        driverDoc,
+        token: driverDoc.data().fcmToken,
+      }))
+      .filter(({ token }) => typeof token === 'string' && token.length > 0);
+
+    const tokens = driversWithTokens.map(({ token }) => token);
 
     if (tokens.length === 0) {
       console.log('No available drivers with FCM tokens.');
@@ -45,10 +50,17 @@ exports.notifyDriversOnNewRide = onDocumentCreated(
     // Remove any tokens that are no longer valid
     const staleTokenUpdates = [];
     response.responses.forEach((res, idx) => {
-      if (!res.success && res.error?.code === 'messaging/registration-token-not-registered') {
-        const driverDoc = driversSnapshot.docs[idx];
+      const driverDoc = driversWithTokens[idx]?.driverDoc;
+
+      if (!res.success) {
+        console.error(
+          `Failed to send notification to ${driverDoc?.id ?? 'unknown driver'}: ${res.error?.code ?? 'unknown'} ${res.error?.message ?? ''}`
+        );
+      }
+
+      if (driverDoc && !res.success && res.error?.code === 'messaging/registration-token-not-registered') {
         staleTokenUpdates.push(
-          db.doc(`users/${driverDoc.id}`).update({ fcmToken: admin.firestore.FieldValue.delete() })
+          driverDoc.ref.update({ fcmToken: admin.firestore.FieldValue.delete() })
         );
       }
     });

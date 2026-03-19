@@ -1,10 +1,11 @@
 import { registerFCMToken } from '../utils/registerFCMToken';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { onMessage } from 'firebase/messaging';
 import { collection, doc, addDoc, onSnapshot, query, orderBy, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { db, auth } from '../firebase';
+import { db, auth, messaging } from '../firebase';
 import { RideRequest } from '../types';
 import { Power, MapPin, Phone, Clock, LogOut, User, MessageCircle, Send, History, ChevronDown, ChevronUp, Car } from 'lucide-react';
 
@@ -144,6 +145,32 @@ const DriverDashboard: React.FC = () => {
       setLoading(false);
     });
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    return onMessage(messaging, async (payload) => {
+      const notification = payload.notification ?? {};
+      const title = notification.title ?? 'New notification';
+      const body = notification.body ?? '';
+
+      console.log('Foreground FCM message received:', payload);
+
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+        return;
+      }
+
+      const options = {
+        body,
+        icon: `${import.meta.env.BASE_URL}favicon.svg`,
+      };
+
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.showNotification(title, options);
+      } catch {
+        new Notification(title, options);
+      }
+    });
   }, []);
 
   // Client-side inactivity timeout check on mount

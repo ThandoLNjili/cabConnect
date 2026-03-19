@@ -8,6 +8,9 @@
     "host": "npm run dev -- --host",
     "build": "vite build",
     "preview": "vite preview",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
